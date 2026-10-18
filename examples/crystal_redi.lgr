@@ -1,0 +1,105 @@
+// ============================================================================
+// BERKAS SUMBER BAHASA PEMROGRAMAN LGR (.lgr)
+// Nama Berkas : crystal_redi.lgr
+// Deskripsi   : Definisi Material Optik Kristal & Fluida Mandiri LGR v1.0
+// ============================================================================
+
+material CrownCrystalRedi {
+    optics {
+        refractiveIndex: 1.52ior;
+        cauchyDispersion: 0.0052;
+        wavelengths: spectrum(650nm, 550nm, 450nm);
+        meniscusRimWidth: 9.2px;
+        totalInternalReflection: true;
+    }
+
+    fluid {
+        incompressibility: true;
+        weberStretchX: 0.28;
+        weberCompressY: 0.14;
+        characteristicVelocity: 1180px;
+        marangoniRadius: 20px;
+        dampingRatio: 0.88;
+        responseTime: 0.36s;
+    }
+
+    lighting {
+        keyLightExp: 54.0;
+        crownShelfExp: 14.0;
+        bottomRimBounceExp: 34.0;
+        bernoulliGlintExp: 22.0;
+        tintColor: #FFFDF8;
+        accentColor: #D97706;
+    }
+
+    caustics {
+        mode: analytical_jacobian;
+        intensity: 0.38;
+        focusHeight: 2.5px;
+    }
+}
+
+material DiamondPrismRedi {
+    optics {
+        refractiveIndex: 2.417ior;
+        cauchyDispersion: 0.0142;
+        wavelengths: spectrum(650nm, 550nm, 450nm);
+        meniscusRimWidth: 10.5px;
+        totalInternalReflection: true;
+    }
+
+    fluid {
+        incompressibility: true;
+        weberStretchX: 0.30;
+        weberCompressY: 0.15;
+        characteristicVelocity: 1100px;
+        marangoniRadius: 24px;
+        dampingRatio: 0.82;
+        responseTime: 0.34s;
+    }
+
+    lighting {
+        keyLightExp: 64.0;
+        crownShelfExp: 16.0;
+        bottomRimBounceExp: 38.0;
+        bernoulliGlintExp: 26.0;
+        tintColor: #FFFFFF;
+        accentColor: #38BDF8;
+    }
+
+    caustics {
+        mode: analytical_jacobian;
+        intensity: 0.48;
+        focusHeight: 3.0px;
+    }
+}
+
+scene RediSpatialDock {
+    resolution: vec2(380px, 62px);
+    useMaterial: CrownCrystalRedi;
+
+    invariant {
+        restingScale: 1.0000;
+        restingLiftY: 0.0px;
+        maxDynamicZoom: 1.18;
+        clipGeometry: capsule_exact;
+    }
+
+    vessel HostCapsule {
+        shape: capsule(380px, 62px);
+        baseColor: #F7EEE2;
+        bevelStrength: 0.30;
+    }
+
+    droplet PrimaryLens {
+        shape: capsule(72px, 48px);
+        initialPos: vec2(64px, 31px);
+        coalescence: enabled;
+    }
+
+    droplet SecondaryDroplet {
+        shape: capsule(48px, 44px);
+        initialPos: vec2(190px, 31px);
+        coalescence: enabled;
+    }
+}

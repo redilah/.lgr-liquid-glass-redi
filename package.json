@@ -1,0 +1,31 @@
+{
+  "name": "liquid-glass-redi",
+  "version": "1.0.0",
+  "description": "Liquid Glass Redi (LGR) — Standalone First-Principles Optical & Fluid Mechanics Programming Language and GPU Engine",
+  "type": "module",
+  "main": "runtime/lgrRuntime.js",
+  "bin": {
+    "lgrc": "./compiler/lgrc.js"
+  },
+  "scripts": {
+    "compile": "node compiler/lgrc.js examples/crystal_redi.lgr",
+    "test": "node test-suite.js",
+    "lab": "node serve-lab.js",
+    "start": "node serve-lab.js"
+  },
+  "keywords": [
+    "liquid-glass",
+    "lgr",
+    "optics",
+    "snell-law",
+    "cauchy-dispersion",
+    "navier-stokes",
+    "weber-number",
+    "metaballs",
+    "webgl2",
+    "gpu-shaders",
+    "compiler"
+  ],
+  "author": "redilah",
+  "license": "MIT"
+}
