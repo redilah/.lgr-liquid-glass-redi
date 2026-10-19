@@ -32,6 +32,8 @@ const KEYWORDS = new Set([
   'caustics',
   'resonance',
   'haptics',
+  'compute',
+  'webgpu',
   'invariant',
   'vessel',
   'droplet',

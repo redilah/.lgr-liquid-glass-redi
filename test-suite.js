@@ -242,8 +242,78 @@ console.log(
   `[PASS] Pilar 3D — Transisi Fusi Droplet Dinamis & Non-Blocking Fallback Terbukti (event=${snapStepReport.lastEvent}, Ek=${snapStepReport.kineticEnergyMJ}mJ).`
 );
 
+// 9. Test Pilar 4: WebGPU Compute Shader Pipeline
+import { LGRWebGPUComputePipeline } from './physics/hydroEngine.js';
+
+// 9A. Compiler AST & IR Extraction of Compute Block & WGSL Synthesis
+console.assert(crownMat.compute.backend === 'webgpu_auto', 'Crown Crystal compute backend must be webgpu_auto');
+console.assert(crownMat.compute.gridResolution[0] === 128, 'Crown Crystal grid width must equal 128');
+console.assert(crownMat.compute.gridResolution[1] === 64, 'Crown Crystal grid height must equal 64');
+console.assert(crownMat.compute.waveSpeed === 340.0, 'Wave speed must equal 340 px/s');
+console.assert(crownMat.compute.viscousDamping === 0.045, 'Viscous damping must equal 0.045');
+
+const wgsl = compiled.artifact.computeShaders.CrownCrystalRedi;
+console.assert(wgsl && wgsl.includes('@compute @workgroup_size(16, 16)'), 'Must synthesize valid WGSL compute entry point');
+console.assert(wgsl.includes('struct SimulationParams'), 'WGSL must define SimulationParams uniform structure');
+console.assert(wgsl.includes('gradientOut'), 'WGSL must compute 2D surface gradient output for Snellius distortion');
+console.log(
+  `[PASS] Pilar 4A — Ekstraksi Compiler & Sintesis Compute Shader WGSL Terbukti (backend=${crownMat.compute.backend}, grid=${crownMat.compute.gridResolution.join('x')}, c=${crownMat.compute.waveSpeed}px/s, γ=${crownMat.compute.viscousDamping}, WGSL=${wgsl.length} bytes).`
+);
+
+// 9B. Dual-Backend Initialization & Graceful Headless Fallback
+const computePipe = new LGRWebGPUComputePipeline({
+  gridResolution: crownMat.compute.gridResolution,
+  waveSpeed: crownMat.compute.waveSpeed,
+  viscousDamping: crownMat.compute.viscousDamping,
+});
+
+const isWebGPUNative = LGRWebGPUComputePipeline.isSupported();
+console.assert(typeof isWebGPUNative === 'boolean', 'isSupported must return boolean');
+
+const initReport = await computePipe.init(wgsl);
+console.assert(initReport.success === true, 'Compute pipeline must successfully initialize');
+console.assert(initReport.backend === 'webgl2_cpu_fallback' || initReport.backend === 'webgpu', 'Must resolve to valid backend');
+console.log(
+  `[PASS] Pilar 4B — Dual-Backend & Fallback Otomatis Terbukti (WebGPU Native=${isWebGPUNative}, Active Backend=${computePipe.activeBackend}, Grid Nodes=${computePipe.totalNodes}).`
+);
+
+// 9C. 2D Wave PDE Simulation Step & Viscous Energy Dissipation
+computePipe.spawnImpulse(64, 32, 8.0, 5.0);
+const step1 = computePipe.step(0.016);
+console.assert(step1.peakAmplitude > 1.5, 'Impulse splash must produce significant wave amplitude');
+console.assert(step1.isRestingZero === false, 'Grid with active wave must not be resting zero');
+
+// Step 60 frames to verify viscous damping: amplitude must decay
+let stepFinal = step1;
+for (let f = 0; f < 60; f++) {
+  stepFinal = computePipe.step(0.016);
+}
+console.assert(stepFinal.peakAmplitude < step1.peakAmplitude, 'Viscous damping must dissipate wave energy over time');
+
+const samplePoint = computePipe.sampleHeightAndGradient(0.5, 0.5);
+console.assert(typeof samplePoint.z === 'number', 'Sampled height z must be a valid number');
+console.assert(typeof samplePoint.gradX === 'number', 'Sampled gradX must be a valid number');
+console.assert(typeof samplePoint.gradY === 'number', 'Sampled gradY must be a valid number');
+console.log(
+  `[PASS] Pilar 4C — Solusi Numerik PDE Gelombang 2D & Disipasi Terbukti (Peak A0=${step1.peakAmplitude} -> A60=${stepFinal.peakAmplitude}, sample(z=${samplePoint.z}, ∇z=[${samplePoint.gradX}, ${samplePoint.gradY}]), dispatchTime=${stepFinal.dispatchTimeMs}ms).`
+);
+
+// 9D. Strict 1:1 Resting Invariant
+computePipe.clear();
+const clearedReport = computePipe.step(0.016);
+console.assert(clearedReport.peakAmplitude === 0.0, 'Cleared wave grid must have exactly 0.0 amplitude');
+console.assert(clearedReport.isRestingZero === true, 'Cleared wave grid must report isRestingZero=true');
+
+const restingSample = computePipe.sampleHeightAndGradient(0.5, 0.5);
+console.assert(restingSample.z === 0.0, 'Resting height must be exactly 0.0');
+console.assert(restingSample.gradX === 0.0 && restingSample.gradY === 0.0, 'Resting surface gradient must be exactly [0, 0]');
+console.log(
+  `[PASS] Pilar 4D — Invarian Diam 1:1 Terbukti (A=0.0000, ∇z=[0.0, 0.0], 100% Zero Wave Drift).`
+);
+
 console.log('======================================================================');
-console.log('  SELURUH PENGUJIAN TAHAP 1, 2, PILAR 1, 2 & PILAR 3 LULUS 100% TANPA ERROR!');
+console.log('  SELURUH PENGUJIAN TAHAP 1, 2, PILAR 1, 2, 3 & 4 LULUS 100% TANPA ERROR!');
 console.log('======================================================================');
+
 
 

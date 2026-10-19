@@ -803,4 +803,7 @@ export class LGRHydroResonanceEngine {
   }
 }
 
+export { LGRWebGPUComputePipeline } from './webgpuPipeline.js';
+
+
 

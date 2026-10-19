@@ -691,6 +691,80 @@
       flex-wrap: wrap;
       gap: 6px;
     }
+
+    /* PILAR 4: WebGPU Compute Shader Pipeline Card Styles */
+    .pilar4-card {
+      background: rgba(139, 92, 246, 0.06);
+      border: 1px solid rgba(139, 92, 246, 0.28);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pilar4-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pilar4-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #A78BFA;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pilar4-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pilar4-chip-btn {
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      background: rgba(139, 92, 246, 0.12);
+      color: #EDE9FE;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .pilar4-chip-btn:hover {
+      background: rgba(139, 92, 246, 0.25);
+    }
+
+    .pilar4-chip-btn.active {
+      background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+      color: #FFFFFF;
+      border-color: #C4B5FD;
+      box-shadow: 0 3px 12px rgba(139, 92, 246, 0.35);
+    }
+
+    .pilar4-telemetry-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #CBD5E1;
+      background: rgba(9, 10, 15, 0.55);
+      padding: 7px 11px;
+      border-radius: 10px;
+      border: 1px solid rgba(139, 92, 246, 0.18);
+      font-family: Consolas, monospace;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
   </style>
 </head>
 <body>
@@ -971,6 +1045,44 @@
         </div>
       </div>
 
+      <!-- PILAR 4: WEBGPU COMPUTE SHADER PIPELINE (.WGSL) -->
+      <div class="pilar4-card">
+        <div class="pilar4-header-row">
+          <div class="pilar4-title">🚀 Pilar 4: WebGPU Compute Shader Pipeline (.wgsl)</div>
+          <div class="pilar4-actions">
+            <button class="pilar4-chip-btn active" id="btnComputeMode" onclick="toggleComputeBackend()">🚀 WebGPU: AUTO</button>
+            <button class="pilar4-chip-btn" onclick="triggerComputeShockwave()">🌊 Shockwave</button>
+            <button class="pilar4-chip-btn" onclick="triggerComputeDroplets()">💧 Tetes Hujan</button>
+            <button class="pilar4-chip-btn" onclick="triggerComputeClear()">🎯 Reset Grid</button>
+          </div>
+        </div>
+
+        <div class="sliders-grid">
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Kecepatan Rambat Gelombang (c)</span>
+              <span id="valWaveSpeed">340.0 px/s</span>
+            </div>
+            <input type="range" id="sliderWaveSpeed" min="100" max="600" step="10" value="340" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Redaman Viskositas (γ)</span>
+              <span id="valDamping">0.0450</span>
+            </div>
+            <input type="range" id="sliderDamping" min="0.0100" max="0.1200" step="0.0050" value="0.0450" />
+          </div>
+        </div>
+
+        <div class="pilar4-telemetry-bar">
+          <span id="telComputeBackend">Backend: WebGPU (Memeriksa...)</span>
+          <span id="telComputeGrid">Grid: 128×64 (8.192 Nodes)</span>
+          <span id="telComputePeak">Disipasi: A=0.0000</span>
+          <span id="telComputeTime">Compute: 0.00ms (120 FPS)</span>
+        </div>
+      </div>
+
       <div class="panel-header" style="margin-top: 4px;">
         <div class="panel-title">💻 Live Compiler Bahasa `.lgr` (`lgrc` In-Browser Engine)</div>
       </div>
@@ -1017,6 +1129,13 @@
         audioResonance: true;
         decayTime: 65ms;
     }
+    compute {
+        backend: webgpu_auto;
+        gridResolution: vec2(128, 64);
+        waveSpeed: 340.0;
+        viscousDamping: 0.045;
+        workgroupSize: vec2(16, 16);
+    }
 }</textarea>
 
       <div class="compile-bar">
@@ -1034,7 +1153,7 @@
     import { LGRLexer } from '../compiler/lexer.js';
     import { LGRParser } from '../compiler/parser.js';
     import { LGRAnalyzer } from '../compiler/analyzer.js';
-    import { RK4Spring1D, LGRGyroscopeController, LGROpticalDistortion, LGRHydroResonanceEngine } from '../physics/hydroEngine.js';
+    import { RK4Spring1D, LGRGyroscopeController, LGROpticalDistortion, LGRHydroResonanceEngine, LGRWebGPUComputePipeline } from '../physics/hydroEngine.js';
     import { LGR_VERTEX_SHADER, LGR_FRAGMENT_SHADER } from '../shaders/opticalKernel.js';
 
     // =========================================================================
@@ -1067,6 +1186,15 @@
       boundaryRestitution: 0.65,
       decayTimeMs: 65.0,
     });
+
+    // Pilar 4 State: WebGPU Compute Shader Pipeline
+    const webgpuPipeline = new LGRWebGPUComputePipeline({
+      gridWidth: 128,
+      gridHeight: 64,
+      waveSpeed: 340.0,
+      viscousDamping: 0.045,
+    });
+    webgpuPipeline.init();
 
     function compileLGRText(sourceText) {
       const lexer = new LGRLexer(sourceText);
@@ -1534,6 +1662,24 @@
           }
         }
 
+        // Sync Pilar 4 WebGPU Compute from compiled .lgr AST
+        if (mat.compute) {
+          if (typeof mat.compute.waveSpeed === 'number') {
+            webgpuPipeline.waveSpeed = mat.compute.waveSpeed;
+            const slWave = document.getElementById('sliderWaveSpeed');
+            if (slWave) slWave.value = mat.compute.waveSpeed;
+            const valWave = document.getElementById('valWaveSpeed');
+            if (valWave) valWave.textContent = `${mat.compute.waveSpeed.toFixed(1)} px/s`;
+          }
+          if (typeof mat.compute.viscousDamping === 'number') {
+            webgpuPipeline.viscousDamping = mat.compute.viscousDamping;
+            const slDamp = document.getElementById('sliderDamping');
+            if (slDamp) slDamp.value = mat.compute.viscousDamping;
+            const valDamp = document.getElementById('valDamping');
+            if (valDamp) valDamp.textContent = mat.compute.viscousDamping.toFixed(4);
+          }
+        }
+
         // Update RK4 spring stiffness
         lensX.configure(mat.fluid.derivedRK4.stiffnessK, mat.fluid.derivedRK4.dampingC);
         lensY.configure(mat.fluid.derivedRK4.stiffnessK, mat.fluid.derivedRK4.dampingC);
@@ -1711,6 +1857,13 @@
         audioResonance: true;
         decayTime: 65ms;
     }
+    compute {
+        backend: webgpu_auto;
+        gridResolution: vec2(128, 64);
+        waveSpeed: 340.0;
+        viscousDamping: 0.045;
+        workgroupSize: vec2(16, 16);
+    }
 }`;
         window.compileFromEditor();
       } else if (mode === 'diamond') {
@@ -1757,6 +1910,13 @@
         hapticFeedback: true;
         audioResonance: true;
         decayTime: 75ms;
+    }
+    compute {
+        backend: webgpu_auto;
+        gridResolution: vec2(128, 64);
+        waveSpeed: 420.0;
+        viscousDamping: 0.038;
+        workgroupSize: vec2(16, 16);
     }
 }`;
         window.compileFromEditor();
@@ -1869,6 +2029,61 @@
         document.getElementById('valDecayTime').textContent = `${val.toFixed(0)} ms`;
         if (activeMaterial && activeMaterial.resonance) {
           activeMaterial.resonance.decayTimeMs = val;
+        }
+      });
+    }
+
+    // PILAR 4: WebGPU Compute Pipeline Controls
+    window.toggleComputeBackend = function() {
+      const nextMode = webgpuPipeline.activeBackend === 'webgpu' ? 'webgl2_cpu_fallback' : 'webgpu';
+      webgpuPipeline.setBackendMode(nextMode);
+      const btn = document.getElementById('btnComputeMode');
+      if (btn) {
+        if (webgpuPipeline.activeBackend === 'webgpu') {
+          btn.classList.add('active');
+          btn.textContent = '🚀 WebGPU: AUTO';
+        } else {
+          btn.classList.remove('active');
+          btn.textContent = '⚡ WebGL2/CPU Fallback';
+        }
+      }
+    };
+
+    window.triggerComputeShockwave = function() {
+      webgpuPipeline.injectShockwave(64, 32, 45.0, 4.5);
+      window.triggerDemoBounce();
+    };
+
+    window.triggerComputeDroplets = function() {
+      webgpuPipeline.injectRainDroplets(6, 28.0);
+      lensScaleX.impulse(0.24);
+      lensScaleY.impulse(-0.18);
+    };
+
+    window.triggerComputeClear = function() {
+      webgpuPipeline.clear();
+    };
+
+    const sliderWaveSpeed = document.getElementById('sliderWaveSpeed');
+    if (sliderWaveSpeed) {
+      sliderWaveSpeed.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        webgpuPipeline.waveSpeed = val;
+        document.getElementById('valWaveSpeed').textContent = `${val.toFixed(1)} px/s`;
+        if (activeMaterial && activeMaterial.compute) {
+          activeMaterial.compute.waveSpeed = val;
+        }
+      });
+    }
+
+    const sliderDamping = document.getElementById('sliderDamping');
+    if (sliderDamping) {
+      sliderDamping.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        webgpuPipeline.viscousDamping = val;
+        document.getElementById('valDamping').textContent = val.toFixed(4);
+        if (activeMaterial && activeMaterial.compute) {
+          activeMaterial.compute.viscousDamping = val;
         }
       });
     }
@@ -2172,6 +2387,31 @@
         } else if (resReport.isRestingZero) {
           telResEvent.textContent = 'Event: Diam (Invarian 1:1)';
           telResEvent.style.color = '#94A3B8';
+        }
+
+        // Pilar 4: Live WebGPU Compute Simulation Step & Telemetry
+        if (Math.abs(vx) > 40 || dockDragging) {
+          const nx = Math.max(2, Math.min(webgpuPipeline.gridWidth - 3, Math.floor((lensX.value / vw) * webgpuPipeline.gridWidth)));
+          const ny = Math.max(2, Math.min(webgpuPipeline.gridHeight - 3, Math.floor((lensY.value / vh) * webgpuPipeline.gridHeight)));
+          webgpuPipeline.injectShockwave(nx, ny, Math.min(16.0, Math.abs(vx) * 0.018), 2.2);
+        }
+
+        const computeRep = webgpuPipeline.step(dt);
+        const telBackend = document.getElementById('telComputeBackend');
+        if (telBackend) {
+          telBackend.textContent = `Backend: ${computeRep.backend === 'webgpu' ? '🚀 WebGPU (Active)' : '⚡ WebGL2/CPU Fallback'}`;
+        }
+        const telGrid = document.getElementById('telComputeGrid');
+        if (telGrid) {
+          telGrid.textContent = `Grid: ${webgpuPipeline.gridWidth}×${webgpuPipeline.gridHeight} (${(webgpuPipeline.gridWidth * webgpuPipeline.gridHeight).toLocaleString()} Nodes)`;
+        }
+        const telPeak = document.getElementById('telComputePeak');
+        if (telPeak) {
+          telPeak.textContent = `Disipasi: A=${computeRep.peakAmplitude.toFixed(4)}`;
+        }
+        const telTime = document.getElementById('telComputeTime');
+        if (telTime) {
+          telTime.textContent = `Compute: ${computeRep.executionTimeMs.toFixed(2)}ms (${computeRep.subSteps} sub-steps)`;
         }
       }
 

@@ -270,10 +270,22 @@ export class LGRAnalyzer {
     // Derived Kelvin capillary wave angular frequency: omega = 2 * pi * f
     const omegaCapillary = Number((2.0 * Math.PI * capillaryFrequencyHz).toFixed(4));
 
+    // 6. Pilar 4: WebGPU Compute Shader Pipeline
+    const computeProps = (node.sections.compute || node.sections.webgpu)?.properties || {};
+    const computeBackend =
+      computeProps.backend?.value?.name ||
+      computeProps.backend?.value?.value ||
+      'webgpu_auto';
+    const gridResolution = this.extractVec2(computeProps.gridResolution, [128, 64]);
+    const waveSpeed = this.extractNumber(computeProps.waveSpeed, 340.0);
+    const viscousDamping = this.extractNumber(computeProps.viscousDamping, 0.045);
+    const workgroupSize = this.extractVec2(computeProps.workgroupSize, [16, 16]);
+    const maxParticles = this.extractNumber(computeProps.maxParticles, 4096);
+
     this.diagnostics.push({
       level: 'INFO',
       target: `material:${node.name}`,
-      message: `Dispersi Cauchy terkompilasi: nR=${nRed} (η=${etaRed}), nG=${nGreen} (η=${etaGreen}), nB=${nBlue} (η=${etaBlue}) | Abbe Vd=${abbeNumber} | Fresnel F0=${f0} | Sudut Kritis TIR=${criticalAngleDeg}° | Pegas RK4 (k=${springStiffnessK}, c=${springDampingC}) | Gyro Caustic Sweep (S=${gyroSensitivity}) | Snell Deflection (κ=[-0.340, -0.342, -0.346], d0=${opticalDepth}px) | Hydro-Resonance (f_cap=${capillaryFrequencyHz}Hz, σ=${surfaceTension}N/m, snap=${coalescenceSnapIntensity})`,
+      message: `Dispersi Cauchy terkompilasi: nR=${nRed} (η=${etaRed}), nG=${nGreen} (η=${etaGreen}), nB=${nBlue} (η=${etaBlue}) | Abbe Vd=${abbeNumber} | Fresnel F0=${f0} | Sudut Kritis TIR=${criticalAngleDeg}° | Pegas RK4 (k=${springStiffnessK}, c=${springDampingC}) | Gyro Caustic Sweep (S=${gyroSensitivity}) | Snell Deflection (κ=[-0.340, -0.342, -0.346], d0=${opticalDepth}px) | Hydro-Resonance (f_cap=${capillaryFrequencyHz}Hz, σ=${surfaceTension}N/m, snap=${coalescenceSnapIntensity}) | WebGPU Compute (backend=${computeBackend}, grid=${gridResolution[0]}x${gridResolution[1]}, c=${waveSpeed}px/s, γ=${viscousDamping})`,
     });
 
     return {
@@ -337,6 +349,14 @@ export class LGRAnalyzer {
         snapWaveformMs: [15, 20, 10],
         bounceWaveformMs: [18],
         flickWaveformMs: [8],
+      },
+      compute: {
+        backend: computeBackend,
+        gridResolution,
+        waveSpeed,
+        viscousDamping,
+        workgroupSize,
+        maxParticles,
       },
     };
   }

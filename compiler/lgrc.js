@@ -84,6 +84,12 @@ if (isMain || process.argv[1]?.endsWith('lgrc.js')) {
     console.log(`Shader GPU dibuat   : ${glslPath}`);
   }
 
+  for (const [matName, wgslCode] of Object.entries(result.artifact.computeShaders || {})) {
+    const wgslPath = path.join(outDir, `${baseName}_${matName}.compute.wgsl`);
+    fs.writeFileSync(wgslPath, wgslCode, 'utf8');
+    console.log(`Compute WGSL dibuat : ${wgslPath}`);
+  }
+
   console.log(`Artefak IR dibuat   : ${irOutPath}`);
   console.log(`Waktu Kompilasi     : ${elapsedMs} ms`);
   console.log('======================================================================');

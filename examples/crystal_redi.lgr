@@ -51,6 +51,14 @@ material CrownCrystalRedi {
         audioResonance: enabled;
         decayTime: 65ms;
     }
+
+    compute {
+        backend: webgpu_auto;
+        gridResolution: vec2(128, 64);
+        waveSpeed: 340.0;
+        viscousDamping: 0.045;
+        workgroupSize: vec2(16, 16);
+    }
 }
 
 material DiamondPrismRedi {
@@ -99,6 +107,14 @@ material DiamondPrismRedi {
         hapticFeedback: enabled;
         audioResonance: enabled;
         decayTime: 50ms;
+    }
+
+    compute {
+        backend: webgpu_auto;
+        gridResolution: vec2(160, 80);
+        waveSpeed: 420.0;
+        viscousDamping: 0.038;
+        workgroupSize: vec2(16, 16);
     }
 }
 
