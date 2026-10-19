@@ -272,3 +272,185 @@ export class LGRHydroPhysicsEngine {
     };
   }
 }
+
+/**
+ * PILAR 1: LGR GYROSCOPE & ACCELEROMETER PHYSICAL CAUSTIC SWEEP CONTROLLER
+ * Translates 3-axis smartphone orientation (Roll γ, Pitch β) and linear acceleration
+ * into a 3D unit studio light vector u_lightPos(Lx, Ly, Lz) and hydro-gravity caustic
+ * floor shift using sub-stepped RK4 harmonic filtering.
+ *
+ * Zero-Regression Invariant:
+ *   When at rest (0°, 0°) or on devices without orientation sensors, lightPos
+ *   equals the exact canonical LGR baseline vector and gyroTilt equals [0, 0].
+ */
+export class LGRGyroscopeController {
+  constructor(options = {}) {
+    this.sensitivity = options.sensitivity ?? 0.82;
+    this.maxAngleDeg = options.maxAngleDeg ?? 45.0;
+    this.ergonomicBaselinePitchDeg = options.ergonomicPitchDeg ?? null;
+
+    // RK4 Harmonic Filter (omega_n = 18.5 rad/s, zeta = 0.92 => k = 342.25, c = 34.04)
+    this.springRollX = new RK4Spring1D(0.0, 342.25, 34.04);
+    this.springPitchY = new RK4Spring1D(0.0, 342.25, 34.04);
+
+    this.rawRollDeg = 0.0;
+    this.rawPitchDeg = 0.0;
+    this.virtualMode = false;
+    this.hardwareConnected = false;
+    this._boundOrientation = null;
+    this._boundMotion = null;
+    this._onWakeCallback = options.onWake || null;
+  }
+
+  /**
+   * Sets virtual 3D tilt angles in degrees (for Desktop Lab & Automated Testing)
+   */
+  setVirtualTiltDeg(rollGammaDeg, pitchBetaDeg) {
+    this.virtualMode = true;
+    this.rawRollDeg = Math.max(-this.maxAngleDeg, Math.min(this.maxAngleDeg, rollGammaDeg));
+    this.rawPitchDeg = Math.max(-this.maxAngleDeg, Math.min(this.maxAngleDeg, pitchBetaDeg));
+    const normX = (this.rawRollDeg / this.maxAngleDeg) * this.sensitivity;
+    const normY = (this.rawPitchDeg / this.maxAngleDeg) * this.sensitivity;
+    this.springRollX.setTarget(normX);
+    this.springPitchY.setTarget(normY);
+    if (this._onWakeCallback) this._onWakeCallback();
+  }
+
+  /**
+   * Resets gyroscope to neutral 0° state
+   */
+  resetNeutral() {
+    this.virtualMode = false;
+    this.rawRollDeg = 0.0;
+    this.rawPitchDeg = 0.0;
+    this.ergonomicBaselinePitchDeg = null;
+    this.springRollX.setTarget(0.0);
+    this.springPitchY.setTarget(0.0);
+    if (this._onWakeCallback) this._onWakeCallback();
+  }
+
+  /**
+   * Connects to real smartphone DeviceOrientationEvent / DeviceMotionEvent
+   */
+  async connectHardwareSensor() {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      if (
+        typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function'
+      ) {
+        const perm = await DeviceOrientationEvent.requestPermission();
+        if (perm !== 'granted') return false;
+      }
+    } catch (_) {
+      // Non-iOS or permission not required
+    }
+
+    if (this._boundOrientation) return true;
+
+    this._boundOrientation = (e) => {
+      if (this.virtualMode) return;
+      if (e.gamma === null && e.beta === null) return;
+
+      const gamma = Number(e.gamma) || 0; // Left/Right tilt [-90, 90]
+      const beta = Number(e.beta) || 0;   // Front/Back pitch [-180, 180]
+
+      // Auto-calibrate initial ergonomic hand-holding angle on first reading
+      if (this.ergonomicBaselinePitchDeg === null) {
+        this.ergonomicBaselinePitchDeg = Math.max(-20, Math.min(75, beta));
+      }
+
+      const deltaRoll = Math.max(-this.maxAngleDeg, Math.min(this.maxAngleDeg, gamma));
+      const deltaPitch = Math.max(
+        -this.maxAngleDeg,
+        Math.min(this.maxAngleDeg, beta - this.ergonomicBaselinePitchDeg)
+      );
+
+      // Ignore sub-degree MEMS sensor micro-noise (< 0.35 deg) when already settled
+      if (
+        Math.abs(deltaRoll - this.rawRollDeg) < 0.35 &&
+        Math.abs(deltaPitch - this.rawPitchDeg) < 0.35
+      ) {
+        return;
+      }
+
+      this.hardwareConnected = true;
+      this.rawRollDeg = deltaRoll;
+      this.rawPitchDeg = deltaPitch;
+
+      const normX = (deltaRoll / this.maxAngleDeg) * this.sensitivity;
+      const normY = (deltaPitch / this.maxAngleDeg) * this.sensitivity;
+      this.springRollX.setTarget(normX);
+      this.springPitchY.setTarget(normY);
+
+      if (this._onWakeCallback) this._onWakeCallback();
+    };
+
+    window.addEventListener('deviceorientation', this._boundOrientation, { passive: true });
+    return true;
+  }
+
+  disconnectHardwareSensor() {
+    if (typeof window !== 'undefined' && this._boundOrientation) {
+      window.removeEventListener('deviceorientation', this._boundOrientation);
+      this._boundOrientation = null;
+    }
+  }
+
+  /**
+   * Steps the RK4 gyroscope filter and computes the 3D optical light vector & caustic shift
+   */
+  step(dt = 1 / 60, refractiveIndex = 1.52, focusHeightPx = 2.5) {
+    const clampedDt = Math.min(dt, 0.05);
+    const subSteps = 4;
+    const subDt = clampedDt / subSteps;
+
+    for (let i = 0; i < subSteps; i++) {
+      this.springRollX.stepRK4(subDt);
+      this.springPitchY.stepRK4(subDt);
+    }
+
+    const gx = this.springRollX.value;
+    const gy = this.springPitchY.value;
+
+    // Compute 3D unit studio key light direction vector L = normalize(Lx, Ly, Lz)
+    const rawLx = -gx * 0.85;
+    const rawLy = -0.76 - gy * 0.65;
+    const rawLz = Math.sqrt(Math.max(0.18, 1.0 - Math.min(0.82, gx * gx * 0.45 + gy * gy * 0.35)));
+    const lenL = Math.hypot(rawLx, rawLy, rawLz) || 1.0;
+
+    const lightPos = [
+      Number((rawLx / lenL).toFixed(5)),
+      Number((rawLy / lenL).toFixed(5)),
+      Number((rawLz / lenL).toFixed(5)),
+    ];
+
+    // Snell's Law Hydro-Gravity Caustic Shift:
+    // delta_p = h_focus * tan(arcsin(sin(theta) / n_crystal))
+    const sinThetaX = Math.sin(Math.max(-0.78, Math.min(0.78, gx * 0.75)));
+    const sinThetaY = Math.sin(Math.max(-0.78, Math.min(0.78, gy * 0.75)));
+    const refractedAngleX = Math.asin(sinThetaX / Math.max(1.0, refractiveIndex));
+    const refractedAngleY = Math.asin(sinThetaY / Math.max(1.0, refractiveIndex));
+
+    const causticShiftXY = [
+      Number((focusHeightPx * Math.tan(refractedAngleX) * 6.5).toFixed(4)),
+      Number((focusHeightPx * Math.tan(refractedAngleY) * 6.5).toFixed(4)),
+    ];
+
+    const isSettled =
+      Math.abs(this.springRollX.value - this.springRollX.target) < 0.0006 &&
+      Math.abs(this.springPitchY.value - this.springPitchY.target) < 0.0006 &&
+      Math.abs(this.springRollX.velocity) < 0.005 &&
+      Math.abs(this.springPitchY.velocity) < 0.005;
+
+    return {
+      gyroTilt: [Number(gx.toFixed(5)), Number(gy.toFixed(5))],
+      rollDeg: Number(this.rawRollDeg.toFixed(2)),
+      pitchDeg: Number(this.rawPitchDeg.toFixed(2)),
+      lightPos,
+      causticShiftXY,
+      isSettled,
+    };
+  }
+}

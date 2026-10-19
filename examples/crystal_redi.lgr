@@ -30,6 +30,8 @@ material CrownCrystalRedi {
         bernoulliGlintExp: 22.0;
         tintColor: #FFFDF8;
         accentColor: #D97706;
+        gyroSensitivity: 0.82;
+        ergonomicPitch: 35deg;
     }
 
     caustics {
@@ -65,6 +67,8 @@ material DiamondPrismRedi {
         bernoulliGlintExp: 26.0;
         tintColor: #FFFFFF;
         accentColor: #38BDF8;
+        gyroSensitivity: 0.90;
+        ergonomicPitch: 35deg;
     }
 
     caustics {

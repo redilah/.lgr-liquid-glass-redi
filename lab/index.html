@@ -448,6 +448,78 @@
       font-size: 11.5px;
       line-height: 1.45;
     }
+
+    /* PILAR 1: 3D Gyroscope & Accelerometer Caustic Sweep Card */
+    .gyro-card {
+      background: linear-gradient(145deg, rgba(56, 189, 248, 0.07) 0%, rgba(245, 158, 11, 0.05) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.24);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .gyro-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .gyro-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #38BDF8;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gyro-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .gyro-chip-btn {
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      background: rgba(56, 189, 248, 0.10);
+      color: #E0F2FE;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .gyro-chip-btn:hover {
+      background: rgba(56, 189, 248, 0.22);
+    }
+
+    .gyro-chip-btn.active {
+      background: linear-gradient(135deg, #0284C7, #0369A1);
+      color: #FFFFFF;
+      border-color: #38BDF8;
+      box-shadow: 0 3px 12px rgba(56, 189, 248, 0.32);
+    }
+
+    .gyro-telemetry-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #CBD5E1;
+      background: rgba(9, 10, 15, 0.55);
+      padding: 7px 11px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      font-family: Consolas, monospace;
+    }
   </style>
 </head>
 <body>
@@ -604,6 +676,41 @@
         </div>
       </div>
 
+      <!-- PILAR 1: 3D GYROSCOPE & ACCELEROMETER PHYSICAL CAUSTIC SWEEP -->
+      <div class="gyro-card">
+        <div class="gyro-header-row">
+          <div class="gyro-title">🌊 Pilar 1: Gyroscope & Accelerometer Caustic Sweep</div>
+          <div class="gyro-actions">
+            <button class="gyro-chip-btn" id="btnGyroOrbit" onclick="toggleGyroAutoOrbit()">🔄 Orbit Cahaya 3D</button>
+            <button class="gyro-chip-btn" id="btnGyroHardware" onclick="enableHardwareGyro()">📱 Sensor Gyro HP</button>
+            <button class="gyro-chip-btn" onclick="resetGyroNeutral()">🎯 Reset (0°)</button>
+          </div>
+        </div>
+
+        <div class="sliders-grid">
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Kemiringan Kiri/Kanan (Roll γ)</span>
+              <span id="valGyroRoll">0.0°</span>
+            </div>
+            <input type="range" id="sliderGyroRoll" min="-42" max="42" step="0.5" value="0" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Kemiringan Depan/Belakang (Pitch β)</span>
+              <span id="valGyroPitch">0.0°</span>
+            </div>
+            <input type="range" id="sliderGyroPitch" min="-42" max="42" step="0.5" value="0" />
+          </div>
+        </div>
+
+        <div class="gyro-telemetry-bar">
+          <span id="telLightVec">u_lightPos: (0.000, -0.743, +0.669)</span>
+          <span id="telCausticShift">Caustic Δp: (0.0px, 0.0px)</span>
+        </div>
+      </div>
+
       <div class="panel-header" style="margin-top: 4px;">
         <div class="panel-title">💻 Live Compiler Bahasa `.lgr` (`lgrc` In-Browser Engine)</div>
       </div>
@@ -631,6 +738,8 @@
         bottomRimBounceExp: 34.0;
         bernoulliGlintExp: 22.0;
         tintColor: #FFFDF8;
+        gyroSensitivity: 0.82;
+        ergonomicPitch: 35deg;
     }
     caustics {
         mode: analytical_jacobian;
@@ -654,7 +763,7 @@
     import { LGRLexer } from '../compiler/lexer.js';
     import { LGRParser } from '../compiler/parser.js';
     import { LGRAnalyzer } from '../compiler/analyzer.js';
-    import { RK4Spring1D } from '../physics/hydroEngine.js';
+    import { RK4Spring1D, LGRGyroscopeController } from '../physics/hydroEngine.js';
     import { LGR_VERTEX_SHADER, LGR_FRAGMENT_SHADER } from '../shaders/opticalKernel.js';
 
     // =========================================================================
@@ -662,6 +771,11 @@
     // =========================================================================
     let activeMaterial = null;
     let beyondAppleMode = 1.0;
+    const gyroController = new LGRGyroscopeController({
+      sensitivity: 0.82,
+      ergonomicPitchDeg: 35.0,
+    });
+    let gyroAutoOrbit = false;
 
     function compileLGRText(sourceText) {
       const lexer = new LGRLexer(sourceText);
@@ -829,7 +943,8 @@
       'u_secondaryPos', 'u_secondaryHalfSize', 'u_secondaryActive',
       'u_glassActive', 'u_glassLift', 'u_tiltX', 'u_weber', 'u_shear', 'u_snellMag',
       'u_etaRGB', 'u_fresnelF0', 'u_rimWidth', 'u_marangoniK',
-      'u_pbrExponents', 'u_causticInt', 'u_tintColor', 'u_beyondApple'
+      'u_pbrExponents', 'u_causticInt', 'u_tintColor', 'u_beyondApple',
+      'u_lightPos', 'u_gyroTilt'
     ].forEach(name => { uLocs[name] = gl.getUniformLocation(mainProgram, name); });
 
     // Stage 1 Physics Springs (Primary Freeform Lens + Center Coalescing Droplet)
@@ -911,6 +1026,7 @@
     uniform float u_lift;
     uniform float u_tilt;
     uniform float u_beyond;
+    uniform vec2 u_gyroTilt;
 
     float capsuleSDF(vec2 p, vec2 b, float r) {
       vec2 d = abs(p) - b;
@@ -928,12 +1044,13 @@
       float edgeAA = 1.0 - smoothstep(-0.7, 0.5, dist);
       float tRim = clamp(-dist / 10.0, 0.0, 1.0);
       float outerRim = (1.0 - smoothstep(0.0, 1.8, -dist)) * 0.95;
-      float fresnel = pow(1.0 - tRim, 4.0) * (0.55 + u_lift * 0.35);
+      float fresnel = pow(1.0 - tRim, 4.0) * (0.55 + u_lift * 0.35 + length(u_gyroTilt) * 0.18);
 
+      float effectiveTilt = u_tilt + u_gyroTilt.x * 0.65;
       vec3 rainbow = vec3(
-        smoothstep(-0.4, 0.4, rel.x * 0.04 + u_tilt),
+        smoothstep(-0.4, 0.4, rel.x * 0.04 + effectiveTilt),
         0.85,
-        smoothstep(-0.4, 0.4, -rel.x * 0.04 - u_tilt)
+        smoothstep(-0.4, 0.4, -rel.x * 0.04 - effectiveTilt)
       ) * (1.0 - tRim) * 0.38 * u_beyond;
 
       float alpha = clamp(outerRim + fresnel, 0.0, 1.0) * edgeAA;
@@ -956,6 +1073,7 @@
       u_lift: dockGl.getUniformLocation(dockProg, 'u_lift'),
       u_tilt: dockGl.getUniformLocation(dockProg, 'u_tilt'),
       u_beyond: dockGl.getUniformLocation(dockProg, 'u_beyond'),
+      u_gyroTilt: dockGl.getUniformLocation(dockProg, 'u_gyroTilt'),
     };
 
     const dockSpringX = new RK4Spring1D(50, 320, 30);
@@ -1023,6 +1141,11 @@
         document.getElementById('sliderRim').value = mat.optics.meniscusRimWidth;
         document.getElementById('valRim').textContent = `${mat.optics.meniscusRimWidth} px`;
 
+        // Sync Pilar 1 Gyroscope Sensitivity from compiled .lgr AST
+        if (typeof mat.lighting.gyroSensitivity === 'number') {
+          gyroController.sensitivity = mat.lighting.gyroSensitivity;
+        }
+
         // Update RK4 spring stiffness
         lensX.configure(mat.fluid.derivedRK4.stiffnessK, mat.fluid.derivedRK4.dampingC);
         lensY.configure(mat.fluid.derivedRK4.stiffnessK, mat.fluid.derivedRK4.dampingC);
@@ -1059,6 +1182,57 @@
       }, 320);
     };
 
+    // PILAR 1: Gyroscope Interactive Controls
+    const sliderGyroRoll = document.getElementById('sliderGyroRoll');
+    const sliderGyroPitch = document.getElementById('sliderGyroPitch');
+    const valGyroRoll = document.getElementById('valGyroRoll');
+    const valGyroPitch = document.getElementById('valGyroPitch');
+    const btnGyroOrbit = document.getElementById('btnGyroOrbit');
+    const btnGyroHardware = document.getElementById('btnGyroHardware');
+
+    function onManualGyroSlider() {
+      gyroAutoOrbit = false;
+      btnGyroOrbit.classList.remove('active');
+      const roll = parseFloat(sliderGyroRoll.value) || 0;
+      const pitch = parseFloat(sliderGyroPitch.value) || 0;
+      valGyroRoll.textContent = `${roll.toFixed(1)}°`;
+      valGyroPitch.textContent = `${pitch.toFixed(1)}°`;
+      gyroController.setVirtualTiltDeg(roll, pitch);
+    }
+
+    sliderGyroRoll.addEventListener('input', onManualGyroSlider);
+    sliderGyroPitch.addEventListener('input', onManualGyroSlider);
+
+    window.toggleGyroAutoOrbit = function () {
+      gyroAutoOrbit = !gyroAutoOrbit;
+      btnGyroOrbit.classList.toggle('active', gyroAutoOrbit);
+      if (!gyroAutoOrbit) {
+        window.resetGyroNeutral();
+      }
+    };
+
+    window.enableHardwareGyro = async function () {
+      gyroAutoOrbit = false;
+      btnGyroOrbit.classList.remove('active');
+      const ok = await gyroController.enableHardwareSensor();
+      if (ok) {
+        btnGyroHardware.classList.add('active');
+        btnGyroHardware.textContent = '📱 Gyro HP Aktif';
+      } else {
+        btnGyroHardware.textContent = '⚠️ Sensor Tidak Tersedia';
+      }
+    };
+
+    window.resetGyroNeutral = function () {
+      gyroAutoOrbit = false;
+      btnGyroOrbit.classList.remove('active');
+      sliderGyroRoll.value = 0;
+      sliderGyroPitch.value = 0;
+      valGyroRoll.textContent = '0.0°';
+      valGyroPitch.textContent = '0.0°';
+      gyroController.resetNeutral();
+    };
+
     window.selectPreset = function (mode) {
       document.querySelectorAll('.preset-pills .preset-btn').forEach(b => b.classList.remove('active'));
       if (mode === 'crown') {
@@ -1087,6 +1261,8 @@
         bottomRimBounceExp: 34.0;
         bernoulliGlintExp: 22.0;
         tintColor: #FFFDF8;
+        gyroSensitivity: 0.82;
+        ergonomicPitch: 35deg;
     }
     caustics {
         mode: analytical_jacobian;
@@ -1121,6 +1297,8 @@
         bottomRimBounceExp: 38.0;
         bernoulliGlintExp: 26.0;
         tintColor: #FFFFFF;
+        gyroSensitivity: 0.90;
+        ergonomicPitch: 35deg;
     }
     caustics {
         mode: analytical_jacobian;
@@ -1186,6 +1364,24 @@
       }
 
       if (activeMaterial) {
+        // --- STEP PILAR 1: 3D GYROSCOPE & ACCELEROMETER CAUSTIC SWEEP ---
+        if (gyroAutoOrbit) {
+          const tSec = now * 0.0018;
+          const orbitRoll = Math.sin(tSec) * 30.0;
+          const orbitPitch = Math.cos(tSec * 0.85) * 22.0;
+          sliderGyroRoll.value = orbitRoll.toFixed(1);
+          sliderGyroPitch.value = orbitPitch.toFixed(1);
+          valGyroRoll.textContent = `${orbitRoll.toFixed(1)}°`;
+          valGyroPitch.textContent = `${orbitPitch.toFixed(1)}°`;
+          gyroController.setVirtualTiltDeg(orbitRoll, orbitPitch);
+        }
+
+        const gyroState = gyroController.step(
+          dt,
+          activeMaterial.optics.refractiveIndex,
+          activeMaterial.caustics.focusHeight || 2.5
+        );
+
         // --- STEP STAGE 1 PHYSICS (4x Sub-Stepped RK4) ---
         const subSteps = 4;
         const subDt = dt / subSteps;
@@ -1266,6 +1462,8 @@
         gl.uniform1f(uLocs.u_causticInt, activeMaterial.caustics.intensity);
         gl.uniform3f(uLocs.u_tintColor, tintColor[0], tintColor[1], tintColor[2]);
         gl.uniform1f(uLocs.u_beyondApple, beyondAppleMode);
+        gl.uniform3f(uLocs.u_lightPos, gyroState.lightPos[0], gyroState.lightPos[1], gyroState.lightPos[2]);
+        gl.uniform2f(uLocs.u_gyroTilt, gyroState.gyroTilt[0], gyroState.gyroTilt[1]);
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -1310,7 +1508,8 @@
         dockBubbleEl.style.setProperty('--glass-lift', dockLift.value.toFixed(3));
         dockBubbleEl.style.setProperty('--bounce-activity', dBounceAct.toFixed(3));
 
-        const pct = Math.max(8, Math.min(92, (dockSpringX.value / dWidth) * 100));
+        const gyroSpecShiftPct = gyroState.gyroTilt[0] * 12.0;
+        const pct = Math.max(8, Math.min(92, (dockSpringX.value / dWidth) * 100 + gyroSpecShiftPct));
         dockEl.style.setProperty('--bubble-x-pct', `${pct.toFixed(1)}%`);
 
         dockLensWorldEl.style.transformOrigin = `${dockSpringX.value.toFixed(2)}px ${(dHeight / 2).toFixed(2)}px`;
@@ -1336,6 +1535,7 @@
         dockGl.uniform1f(dockULocs.u_lift, dockLift.value);
         dockGl.uniform1f(dockULocs.u_tilt, dockTilt.value);
         dockGl.uniform1f(dockULocs.u_beyond, beyondAppleMode);
+        dockGl.uniform2f(dockULocs.u_gyroTilt, gyroState.gyroTilt[0], gyroState.gyroTilt[1]);
         dockGl.drawArrays(dockGl.TRIANGLES, 0, 6);
 
         // Update Telemetry HUD
@@ -1347,6 +1547,11 @@
         document.getElementById('telScale').textContent = `${sX.toFixed(3)} × ${sY.toFixed(3)}`;
         document.getElementById('telZoom').textContent = `${Math.max(snellMag, dSnellMag).toFixed(4)}x`;
         document.getElementById('telFusion').textContent = `${fusionPct.toFixed(0)}%`;
+
+        document.getElementById('telLightVec').textContent =
+          `u_lightPos: (${gyroState.lightPos[0].toFixed(3)}, ${gyroState.lightPos[1].toFixed(3)}, +${gyroState.lightPos[2].toFixed(3)})`;
+        document.getElementById('telCausticShift').textContent =
+          `Caustic Δp: (${gyroState.causticShiftXY[0].toFixed(1)}px, ${gyroState.causticShiftXY[1].toFixed(1)}px)`;
 
         const restBadge = document.getElementById('restingBadge');
         if (dBounceAct === 0.0) {

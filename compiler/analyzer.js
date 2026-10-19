@@ -199,6 +199,14 @@ export class LGRAnalyzer {
       lightingProps.accentColor,
       [0.851, 0.4667, 0.0235, 1.0]
     );
+    const gyroSensitivity = this.extractNumber(
+      lightingProps.gyroSensitivity,
+      0.82
+    );
+    const ergonomicPitchRad = this.extractNumber(
+      lightingProps.ergonomicPitch,
+      (35.0 * Math.PI) / 180.0
+    );
 
     // 4. Analytical Caustics
     const causticsMode =
@@ -217,7 +225,7 @@ export class LGRAnalyzer {
     this.diagnostics.push({
       level: 'INFO',
       target: `material:${node.name}`,
-      message: `Dispersi Cauchy terkompilasi: nR=${nRed} (η=${etaRed}), nG=${nGreen} (η=${etaGreen}), nB=${nBlue} (η=${etaBlue}) | Abbe Vd=${abbeNumber} | Fresnel F0=${f0} | Sudut Kritis TIR=${criticalAngleDeg}° | Pegas RK4 (k=${springStiffnessK}, c=${springDampingC})`,
+      message: `Dispersi Cauchy terkompilasi: nR=${nRed} (η=${etaRed}), nG=${nGreen} (η=${etaGreen}), nB=${nBlue} (η=${etaBlue}) | Abbe Vd=${abbeNumber} | Fresnel F0=${f0} | Sudut Kritis TIR=${criticalAngleDeg}° | Pegas RK4 (k=${springStiffnessK}, c=${springDampingC}) | Gyro Caustic Sweep (S=${gyroSensitivity})`,
     });
 
     return {
@@ -257,6 +265,8 @@ export class LGRAnalyzer {
         bernoulliGlintExp,
         tintColor,
         accentColor,
+        gyroSensitivity,
+        ergonomicPitchRad: Number(ergonomicPitchRad.toFixed(6)),
       },
       caustics: {
         mode: causticsMode,

@@ -53,6 +53,10 @@ uniform float u_causticInt;     // Jacobian caustic intensity
 uniform vec3 u_tintColor;       // Crystal body tint
 uniform float u_beyondApple;    // 0.0 = Apple Standard, 1.0 = LGR Beyond-Apple
 
+// Pilar 1: Gyroscope & Accelerometer Physical Caustic Sweep Uniforms
+uniform vec3 u_lightPos;        // 3D Physical Light Vector (Lx, Ly, Lz) from Gyroscope
+uniform vec2 u_gyroTilt;        // Normalized 2D Hydro-Gravity Tilt (gx, gy)
+
 float fresnelSchlick(float cosTheta, float F0) {
   float c = clamp(1.0 - cosTheta, 0.0, 1.0);
   float c2 = c * c;
@@ -120,24 +124,26 @@ void main() {
 
   // 1. Exterior Region: Render Cast Shadow & Analytical Jacobian Caustic Glow on Floor
   if (dist > 0.5) {
-    if (dist < 28.0) {
-      // Soft physical drop shadow under elevated glass lens
-      vec2 shadowOffset = vec2(-u_tiltX * 2.2, 3.0 + u_glassLift * 5.5);
+    if (dist < 32.0) {
+      // Soft physical drop shadow under elevated glass lens (sweeps with Gyroscope orientation!)
+      vec2 shadowOffset = vec2(-u_tiltX * 2.2 - u_gyroTilt.x * 5.2, 3.0 + u_glassLift * 5.5 - u_gyroTilt.y * 4.2);
       vec2 dummyQ;
       float shadowDist = evaluateFluidSDF(fragPx - shadowOffset, dummyQ);
       float shadowMask = exp(-max(0.0, shadowDist) * 0.16) * (0.14 + u_glassLift * 0.14) * smoothstep(0.0, 2.5, dist);
       finalRGB *= (1.0 - shadowMask);
 
-      // Analytical Jacobian Forward Ray Caustics (concentrated light ring beneath meniscus)
-      float causticShiftDist = evaluateFluidSDF(fragPx - vec2(-u_tiltX * 3.2, 1.8 + u_glassLift * 3.2), dummyQ);
+      // Analytical Jacobian Forward Ray Caustics (sweeps dynamically with u_gyroTilt & u_tiltX)
+      vec2 causticOffset = vec2(-u_tiltX * 3.2 - u_gyroTilt.x * 6.8, 1.8 + u_glassLift * 3.2 - u_gyroTilt.y * 5.4);
+      float causticShiftDist = evaluateFluidSDF(fragPx - causticOffset, dummyQ);
       float jacobianConvergence = mix(
         1.0,
         1.0 / max(0.24, 1.0 - 0.52 * exp(-abs(causticShiftDist - 2.2) * 0.42)),
         u_beyondApple
       );
+      float gyroCausticBoost = 1.0 + length(u_gyroTilt) * 0.45;
       float causticRing = exp(-pow(max(0.0, causticShiftDist - 1.4) * 0.28, 2.0))
-                        * u_causticInt * (0.45 + u_glassLift * 0.75) * jacobianConvergence
-                        * smoothstep(24.0, 0.8, dist);
+                        * u_causticInt * (0.45 + u_glassLift * 0.75) * jacobianConvergence * gyroCausticBoost
+                        * smoothstep(26.0, 0.8, dist);
 
       // Subtle warm golden-crystal caustic illumination on the floor
       finalRGB += vec3(1.0, 0.96, 0.88) * causticRing * 0.55;
@@ -167,7 +173,8 @@ void main() {
   vec2 domeCoord = qLocal / max(vec2(1.0), u_bubbleHalfSize);
   vec2 N_xy = vec2(-dzdx, -dzdy) * (0.82 + u_glassLift * 0.22) + domeCoord * (0.14 + u_glassActive * 0.08);
   float tRim = clamp(-dist / rimW, 0.0, 1.0);
-  N_xy.x -= u_tiltX * 0.24 * (0.4 + 0.6 * tRim);
+  N_xy.x -= (u_tiltX + u_gyroTilt.x * 0.75) * 0.24 * (0.4 + 0.6 * tRim);
+  N_xy.y -= (u_gyroTilt.y * 0.75) * 0.24 * (0.4 + 0.6 * tRim);
 
   vec3 N = normalize(vec3(N_xy.x, N_xy.y, 1.0));
   vec3 V = vec3(0.0, 0.0, 1.0);
@@ -210,26 +217,32 @@ void main() {
   float fresnel = fresnelSchlick(cosIncident, u_fresnelF0);
 
   // Prismatic diamond edge dispersion flare when rays diverge at glancing angles
-  float spectralSpread = length(R_blue.xy - R_red.xy) * 26.0 * (0.65 + 0.5 * abs(u_tiltX) + u_weber);
+  float combinedTiltMag = abs(u_tiltX) + length(u_gyroTilt) * 0.85;
+  float spectralSpread = length(R_blue.xy - R_red.xy) * 26.0 * (0.65 + 0.5 * combinedTiltMag + u_weber);
   vec3 prismaticRimFlare = vec3(
     smoothstep(-0.08, 0.28, N.x + N.y * 0.5) * 1.15,
     smoothstep(0.0, 0.35, 1.0 - abs(N.x - N.y)) * 0.90,
     smoothstep(-0.08, 0.28, -N.x - N.y * 0.5) * 1.25
   ) * clamp(spectralSpread, 0.0, 0.85) * rimMask * u_beyondApple;
 
-  // 5. 4-Light Studio PBR Specular Reflections (Blinn-Phong)
-  vec3 L_key = normalize(vec3(-u_tiltX * 0.45, -0.76 - u_glassLift * 0.12, 0.65));
+  // 5. 4-Light Studio PBR Specular Reflections + Pilar 1 Gyroscope Light Sweep
+  vec3 fallbackLightDir = normalize(vec3(-u_tiltX * 0.45 - u_gyroTilt.x * 0.85, -0.76 - u_glassLift * 0.12 - u_gyroTilt.y * 0.65, 0.65));
+  vec3 L_key = (length(u_lightPos) > 0.01)
+    ? normalize(u_lightPos + vec3(-u_tiltX * 0.35, -u_glassLift * 0.12, 0.0))
+    : fallbackLightDir;
+
   float specKey = pow(max(0.0, dot(N, normalize(L_key + V))), u_pbrExponents.x) * (0.92 + u_glassLift * 0.25);
 
   float specCrown = pow(max(0.0, dot(N, normalize(L_key + V))), u_pbrExponents.y)
                   * (0.24 + (1.0 - u_glassActive) * 0.14)
-                  * (1.0 - smoothstep(-0.85, 0.05, domeCoord.y));
+                  * (1.0 - smoothstep(-0.85, 0.05, domeCoord.y + u_gyroTilt.y * 0.35));
 
-  float specBottomRim = pow(max(0.0, dot(N, normalize(vec3(u_tiltX * 0.28, 0.84, 0.52) + V))), u_pbrExponents.z)
+  float specBottomRim = pow(max(0.0, dot(N, normalize(vec3((u_tiltX + u_gyroTilt.x) * 0.28, 0.84 - u_gyroTilt.y * 0.25, 0.52) + V))), u_pbrExponents.z)
                       * (0.58 + u_glassLift * 0.24);
 
-  float specBernoulli = pow(max(0.0, dot(N, normalize(vec3(sign(u_tiltX) * 0.86, -0.10, 0.50) + V))), u_pbrExponents.w)
-                      * abs(u_tiltX) * 0.68;
+  float effTiltX = u_tiltX + u_gyroTilt.x;
+  float specBernoulli = pow(max(0.0, dot(N, normalize(vec3(sign(effTiltX) * 0.86, -0.10 - u_gyroTilt.y * 0.25, 0.50) + V))), u_pbrExponents.w)
+                      * min(1.2, abs(effTiltX)) * 0.68;
 
   // Razor-sharp outer crystal bevel ring + Fresnel glancing reflection wall
   float outerCrispRim = (1.0 - smoothstep(0.0, 1.85, -dist)) * (0.95 + u_glassLift * 0.05);

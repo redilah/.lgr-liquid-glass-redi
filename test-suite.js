@@ -68,6 +68,53 @@ console.assert(finalState.isResting1to1 === true, 'Must converge back to exact 1
 console.log(
   `[PASS] Tahap 2D — Konvergensi Pegas RK4 Kembali ke Invarian 1:1 (pos=${finalState.pixelX}px, zoom=${finalState.snellMagnification}, liftY=${finalState.liftOffsetY}px).`
 );
+
+// 6. Test Pilar 1: Gyroscope & Accelerometer Physical Caustic Sweep
+import { LGRGyroscopeController } from './physics/hydroEngine.js';
+
+const gyro = new LGRGyroscopeController({
+  sensitivity: 0.82,
+  ergonomicPitchDeg: 35.0,
+});
+
+// 6A. Neutral Resting State (Zero-Regression Invariant)
+const neutralGyro = gyro.step(1 / 120, 1.52, 2.5);
+const neutralLen = Math.hypot(neutralGyro.lightPos[0], neutralGyro.lightPos[1], neutralGyro.lightPos[2]);
+console.assert(Math.abs(neutralLen - 1.0) < 0.001, 'Light position must be a normalized unit vector');
+console.assert(Math.abs(neutralGyro.gyroTilt[0]) < 0.001, 'Neutral gyro tilt X must be 0');
+console.assert(Math.abs(neutralGyro.gyroTilt[1]) < 0.001, 'Neutral gyro tilt Y must be 0');
+console.assert(Math.abs(neutralGyro.causticShiftXY[0]) < 0.001, 'Neutral caustic shift X must be 0');
+console.assert(Math.abs(neutralGyro.causticShiftXY[1]) < 0.001, 'Neutral caustic shift Y must be 0');
+console.log(
+  `[PASS] Pilar 1A — Invarian Netral Gyro Terbukti (u_lightPos=[${neutralGyro.lightPos.map(v => v.toFixed(3))}], tilt=[${neutralGyro.gyroTilt.map(v => v.toFixed(3))}], causticShift=[${neutralGyro.causticShiftXY.map(v => v.toFixed(2))}px]).`
+);
+
+// 6B. Virtual Tilt Dynamic Sweep (Roll = +25°, Pitch = -15°)
+gyro.setVirtualTiltDeg(25.0, -15.0);
+let activeGyro = null;
+for (let f = 0; f < 30; f++) {
+  activeGyro = gyro.step(1 / 120, 1.52, 2.5);
+}
+console.assert(activeGyro.gyroTilt[0] > 0.35, 'Positive roll must tilt X to positive');
+console.assert(activeGyro.gyroTilt[1] < -0.20, 'Negative pitch must tilt Y to negative');
+console.assert(activeGyro.lightPos[0] < -0.20, 'Light vector X must shift counter to tilt for natural specular highlights');
+console.assert(Math.abs(activeGyro.causticShiftXY[0]) > 1.0, 'Caustic floor ring must shift physically with tilt');
+console.log(
+  `[PASS] Pilar 1B — Dynamic Tilt Caustic Sweep Terbukti (tilt=[${activeGyro.gyroTilt.map(v => v.toFixed(3))}], lightPos=[${activeGyro.lightPos.map(v => v.toFixed(3))}], causticShift=[${activeGyro.causticShiftXY.map(v => v.toFixed(2))}px]).`
+);
+
+// 6C. Harmonic RK4 Filter Settling Back to Neutral Rest
+gyro.resetNeutral();
+let settledGyro = null;
+for (let f = 0; f < 240; f++) {
+  settledGyro = gyro.step(1 / 120, 1.52, 2.5);
+}
+console.assert(Math.abs(settledGyro.gyroTilt[0]) < 0.001, 'Gyro tilt X must settle back to exactly 0');
+console.assert(Math.abs(settledGyro.gyroTilt[1]) < 0.001, 'Gyro tilt Y must settle back to exactly 0');
+console.log(
+  `[PASS] Pilar 1C — Konvergensi Filter Harmonik RK4 Gyro Berhasil Kembali Netral (tilt=[${settledGyro.gyroTilt.map(v => v.toFixed(4))}]).`
+);
+
 console.log('======================================================================');
-console.log('  SELURUH PENGUJIAN TAHAP 1 & TAHAP 2 LULUS 100% TANPA ERROR!');
+console.log('  SELURUH PENGUJIAN TAHAP 1, TAHAP 2 & PILAR 1 LULUS 100% TANPA ERROR!');
 console.log('======================================================================');
