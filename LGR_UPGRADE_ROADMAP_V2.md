@@ -84,9 +84,39 @@ Di alam nyata, lensa kaca cair atau tetesan air yang melengkung dengan profil ti
 
 ---
 
-## 📳 PILAR 3: Audio-Haptic Fluid Hydro-Resonance (Sensasi Fisik Riak Air di Ujung Jari)
-- **Konsep**: Mengonversi energi kinetik gelombang kapiler ($E_k = \frac{1}{2} m v^2$) dan tabrakan penyatuan tetesan (*Marangoni Coalescence Snap*) menjadi pulsa getaran mikro terukur melalui `navigator.vibrate` / Android Haptic Waveform dan sintetis akustik frekuensi rendah WebAudio opsional.
-- **Jaminan Anti-Rusak**: Dibungkus dalam blok `try/catch` non-blocking; tidak pernah mengganggu thread utama atau melempar error di browser desktop yang tidak memiliki motor getar.
+## 📳 PILAR 3: Audio-Haptic Fluid Hydro-Resonance (SELESAI 100%)
+
+### 1. Rumusan Fisika & Matematika Baru (Dispersi Kapiler Kelvin & Marangoni Snap)
+1. **Hubungan Dispersi Gelombang Kapiler Kelvin ($\omega_{\text{cap}}$)**:
+   Pada skala tetesan mikro di atas permukaan kaca ($Bo \ll 1$), tegangan permukaan $\sigma$ mendominasi gravitasi. Frekuensi sudut gelombang kapiler dirumuskan sebagai:
+   $$\omega_{\text{cap}} = \sqrt{\frac{\sigma}{\rho} k^3}$$
+   Di mana $k = \frac{2\pi}{\lambda}$ adalah bilangan gelombang. Untuk lebar kontak ujung jari/meniskus $\lambda \approx 5.8\text{ mm}$, frekuensi resonansi alami fluida berada pada rentang **$20\text{--}70\text{ Hz}$** ($f_{\text{cap}} \approx 48.4\text{ Hz}$ pada air/kristal $\sigma = 0.0728\text{ N/m}$, $\rho = 1000\text{ kg/m}^3$), yang secara biologis bertepatan dengan sensitivitas mekanoreseptor korpuskel Meissner pada kulit manusia dan Linear Resonant Actuator (LRA) Android!
+
+2. **Energi Kinetik Tetesan ($E_k$)**:
+   Besar energi getaran yang ditransfer ke motor haptic dan akustik diturunkan dari kecepatan linier tetesan $v$:
+   $$E_k = \frac{1}{2} m v^2$$
+
+3. **Marangoni Coalescence Snap (Peleburan Tetesan)**:
+   Ketika dua tetesan air menyatu melintasi batas fusi ($\text{coalescenceFactor} \ge 0.5$), energi bebas permukaan $\Delta E_{\text{surface}} = \sigma \Delta A$ dilepaskan secara spontan, menghasilkan sentakan transien taktil impulsif berupa pola getar double-tap:
+   $$\text{snapWaveformMs} = [15\text{ ms}, 20\text{ ms jeda}, 10\text{ ms}]$$
+   disertai klik akustik sintetis WebAudio sinusoidal teredam:
+   $$s(t) = A_0 \exp\left(-\frac{t}{\tau}\right) \sin(2\pi f_{\text{cap}} t)$$
+
+4. **Invarian Diam 1:1 Tanpa Getar (Strict Zero-Vibration Resting Guard)**:
+   Saat tetesan berada dalam keadaan diam ($v_x = 0$, $\text{isResting1to1} = \text{true}$), sistem secara mutlak menghasilkan 0 pulsa getaran dan 0 suara klik:
+   $$E_k \equiv 0.0\text{ mJ} \implies \text{hapticEmitted} = \text{false}, \text{audioEmitted} = \text{false}$$
+
+### 2. Cakupan Implementasi Pilar 3
+- **Bahasa `.lgr` & Compiler (`compiler/`)**:
+  - Penambahan kata kunci `resonance`, `haptics`, dan satuan fisika `Hz`, `hz`, `N`, `mJ`, `J` di `LGRLexer`.
+  - Ekstraksi blok `resonance` (`capillaryFrequency`, `surfaceTension`, `coalescenceSnapIntensity`, `boundaryRestitution`, `hapticFeedback`, `audioResonance`, `decayTime`) dan derivasi otomatis frekuensi sudut Kelvin $\omega_{\text{cap}} = 2\pi f_{\text{cap}}$ di `LGRAnalyzer`.
+  - Pembakaran konstanta GLSL compile-time `LGR_CAPILLARY_FREQ` dan `LGR_SURFACE_TENSION` di `LGRCodeGenerator`.
+- **Mesin Fisika Fluida (`physics/hydroEngine.js`)**:
+  - Mengimplementasikan kelas `LGRHydroResonanceEngine` dengan metode evaluasi energi kinetik $E_k$, frekuensi teoritis Kelvin $\omega_{\text{cap}}$, pemicu getaran `navigator.vibrate`, dan sintesis audio WebAudio non-blocking terlindungi `try/catch`.
+- **Workbench Interaktif (`lab/index.html`)**:
+  - Kartu **Pilar 3: Audio-Haptic Fluid Hydro-Resonance** dengan toggle Haptic & Audio, tombol pemicu manual (*Marangoni Snap, Flick Ripple, Wall Bounce*), slider interaktif ($f_{\text{cap}}$, $\sigma$, $\text{snap}$, $\tau$), dan HUD telemetri live ($f_{\text{cap}}$, $E_k$, Event).
+- **Verifikasi Otomatis (`test-suite.js`)**:
+  - Lulus 100% pada 4 pengujian kunci Pilar 3 (Compiler Resonance & Kelvin Frequency, Kinetic Energy & Snap Waveform, Strict Resting Invariant, Dynamic Droplet Fusion Transition & Non-Blocking Fallback).
 
 ---
 

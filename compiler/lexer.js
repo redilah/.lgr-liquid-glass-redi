@@ -30,6 +30,8 @@ const KEYWORDS = new Set([
   'fluid',
   'lighting',
   'caustics',
+  'resonance',
+  'haptics',
   'invariant',
   'vessel',
   'droplet',
@@ -38,7 +40,21 @@ const KEYWORDS = new Set([
 
 const BOOLEAN_LITERALS = new Set(['true', 'false', 'enabled', 'disabled']);
 
-const PHYSICAL_UNITS = new Set(['px', '%', 'deg', 'rad', 'nm', 'ior', 'ms', 's']);
+const PHYSICAL_UNITS = new Set([
+  'px',
+  '%',
+  'deg',
+  'rad',
+  'nm',
+  'ior',
+  'ms',
+  's',
+  'Hz',
+  'hz',
+  'N',
+  'mJ',
+  'J',
+]);
 
 export class LGRLexerError extends Error {
   constructor(message, line, column) {

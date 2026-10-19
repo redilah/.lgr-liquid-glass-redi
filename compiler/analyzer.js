@@ -93,6 +93,7 @@ export class LGRAnalyzer {
     const fluidProps = node.sections.fluid?.properties || {};
     const lightingProps = node.sections.lighting?.properties || {};
     const causticsProps = node.sections.caustics?.properties || {};
+    const resonanceProps = (node.sections.resonance || node.sections.haptics)?.properties || {};
 
     // 1. Optical Law Validation & Cauchy Spectral Pre-Computation
     const n0 = this.extractNumber(opticsProps.refractiveIndex, 1.52);
@@ -236,10 +237,43 @@ export class LGRAnalyzer {
       2.5
     );
 
+    // 5. Pilar 3: Audio-Haptic Fluid Hydro-Resonance
+    const capillaryFrequencyHz = this.extractNumber(
+      resonanceProps.capillaryFrequency,
+      48.0
+    );
+    const surfaceTension = this.extractNumber(
+      resonanceProps.surfaceTension,
+      0.0728
+    ); // N/m (surface tension of water/crystal interface)
+    const coalescenceSnapIntensity = this.extractNumber(
+      resonanceProps.coalescenceSnapIntensity,
+      0.85
+    );
+    const boundaryRestitution = this.extractNumber(
+      resonanceProps.boundaryRestitution,
+      0.65
+    );
+    const hapticFeedback = this.extractBoolean(
+      resonanceProps.hapticFeedback,
+      true
+    );
+    const audioResonance = this.extractBoolean(
+      resonanceProps.audioResonance,
+      true
+    );
+    const decayTimeMs = this.extractNumber(
+      resonanceProps.decayTime,
+      65.0
+    );
+
+    // Derived Kelvin capillary wave angular frequency: omega = 2 * pi * f
+    const omegaCapillary = Number((2.0 * Math.PI * capillaryFrequencyHz).toFixed(4));
+
     this.diagnostics.push({
       level: 'INFO',
       target: `material:${node.name}`,
-      message: `Dispersi Cauchy terkompilasi: nR=${nRed} (η=${etaRed}), nG=${nGreen} (η=${etaGreen}), nB=${nBlue} (η=${etaBlue}) | Abbe Vd=${abbeNumber} | Fresnel F0=${f0} | Sudut Kritis TIR=${criticalAngleDeg}° | Pegas RK4 (k=${springStiffnessK}, c=${springDampingC}) | Gyro Caustic Sweep (S=${gyroSensitivity}) | Snell Deflection (κ=[-0.340, -0.342, -0.346], d0=${opticalDepth}px)`,
+      message: `Dispersi Cauchy terkompilasi: nR=${nRed} (η=${etaRed}), nG=${nGreen} (η=${etaGreen}), nB=${nBlue} (η=${etaBlue}) | Abbe Vd=${abbeNumber} | Fresnel F0=${f0} | Sudut Kritis TIR=${criticalAngleDeg}° | Pegas RK4 (k=${springStiffnessK}, c=${springDampingC}) | Gyro Caustic Sweep (S=${gyroSensitivity}) | Snell Deflection (κ=[-0.340, -0.342, -0.346], d0=${opticalDepth}px) | Hydro-Resonance (f_cap=${capillaryFrequencyHz}Hz, σ=${surfaceTension}N/m, snap=${coalescenceSnapIntensity})`,
     });
 
     return {
@@ -290,6 +324,19 @@ export class LGRAnalyzer {
         mode: causticsMode,
         intensity: causticsIntensity,
         focusHeight: causticsFocusHeight,
+      },
+      resonance: {
+        capillaryFrequencyHz,
+        surfaceTension,
+        coalescenceSnapIntensity,
+        boundaryRestitution,
+        hapticFeedback,
+        audioResonance,
+        decayTimeMs,
+        omegaCapillary,
+        snapWaveformMs: [15, 20, 10],
+        bounceWaveformMs: [18],
+        flickWaveformMs: [8],
       },
     };
   }

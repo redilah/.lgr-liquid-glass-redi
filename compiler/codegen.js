@@ -92,6 +92,8 @@ const float LGR_OPTICAL_DEPTH    = ${optics.opticalDepth.toFixed(4)};
 const vec3  LGR_SNELL_KAPPA_RGB  = vec3(${optics.spectralKappa.r.toFixed(6)}, ${optics.spectralKappa.g.toFixed(6)}, ${optics.spectralKappa.b.toFixed(6)});
 const float LGR_CAUSTIC_INT  = ${caustics.intensity.toFixed(4)};
 const vec3  LGR_TINT_COLOR   = ${tintVec3};
+const float LGR_CAPILLARY_FREQ = ${(mat.resonance?.capillaryFrequencyHz ?? 48.0).toFixed(2)};
+const float LGR_SURFACE_TENSION = ${(mat.resonance?.surfaceTension ?? 0.0728).toFixed(4)};
 
 float fresnelSchlick(float cosTheta, float F0) {
   float c = clamp(1.0 - cosTheta, 0.0, 1.0);

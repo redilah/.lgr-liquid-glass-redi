@@ -617,6 +617,80 @@
       flex-wrap: wrap;
       gap: 6px;
     }
+
+    /* PILAR 3: Audio-Haptic Fluid Hydro-Resonance Card Styles */
+    .pilar3-card {
+      background: rgba(16, 185, 129, 0.06);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pilar3-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pilar3-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #34D399;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pilar3-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pilar3-chip-btn {
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      background: rgba(16, 185, 129, 0.12);
+      color: #D1FAE5;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .pilar3-chip-btn:hover {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    .pilar3-chip-btn.active {
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: #FFFFFF;
+      border-color: #6EE7B7;
+      box-shadow: 0 3px 12px rgba(16, 185, 129, 0.35);
+    }
+
+    .pilar3-telemetry-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #CBD5E1;
+      background: rgba(9, 10, 15, 0.55);
+      padding: 7px 11px;
+      border-radius: 10px;
+      border: 1px solid rgba(16, 185, 129, 0.18);
+      font-family: Consolas, monospace;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
   </style>
 </head>
 <body>
@@ -842,6 +916,61 @@
         </div>
       </div>
 
+      <!-- PILAR 3: AUDIO-HAPTIC FLUID HYDRO-RESONANCE -->
+      <div class="pilar3-card">
+        <div class="pilar3-header-row">
+          <div class="pilar3-title">📳 Pilar 3: Audio-Haptic Fluid Hydro-Resonance</div>
+          <div class="pilar3-actions">
+            <button class="pilar3-chip-btn active" id="btnHapticToggle" onclick="toggleHapticFeedback()">📳 Haptic: AKTIF</button>
+            <button class="pilar3-chip-btn active" id="btnAudioToggle" onclick="toggleAudioResonance()">🔊 Audio: AKTIF</button>
+            <button class="pilar3-chip-btn" onclick="triggerTestCoalescenceSnap()">💧 Marangoni Snap</button>
+            <button class="pilar3-chip-btn" onclick="triggerTestFlickRipple()">🌊 Flick Ripple</button>
+            <button class="pilar3-chip-btn" onclick="triggerTestBoundaryBounce()">🛡️ Bounce</button>
+          </div>
+        </div>
+
+        <div class="sliders-grid">
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Frekuensi Kapiler (f_cap)</span>
+              <span id="valCapFreq">48.0 Hz</span>
+            </div>
+            <input type="range" id="sliderCapFreq" min="20" max="70" step="1" value="48" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Tegangan Permukaan (σ)</span>
+              <span id="valSurfaceTension">0.0728 N/m</span>
+            </div>
+            <input type="range" id="sliderSurfaceTension" min="0.0300" max="0.1200" step="0.0020" value="0.0728" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Intensitas Snap Peleburan</span>
+              <span id="valSnapIntensity">0.85</span>
+            </div>
+            <input type="range" id="sliderSnapIntensity" min="0.20" max="1.50" step="0.05" value="0.85" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Waktu Peluruhan (Decay τ)</span>
+              <span id="valDecayTime">65 ms</span>
+            </div>
+            <input type="range" id="sliderDecayTime" min="25" max="150" step="5" value="65" />
+          </div>
+        </div>
+
+        <div class="pilar3-telemetry-bar">
+          <span id="telCapFreq">f_cap: 48Hz (ω=301.6 rad/s)</span>
+          <span id="telKineticEnergy">Ek: 0.0000 mJ</span>
+          <span id="telResEvent">Event: Diam (Invarian 1:1)</span>
+          <span id="telResStatus">Device: WebAudio Siap • Haptic Siap</span>
+        </div>
+      </div>
+
       <div class="panel-header" style="margin-top: 4px;">
         <div class="panel-title">💻 Live Compiler Bahasa `.lgr` (`lgrc` In-Browser Engine)</div>
       </div>
@@ -853,6 +982,8 @@
         wavelengths: spectrum(650nm, 550nm, 450nm);
         meniscusRimWidth: 13.5px;
         totalInternalReflection: true;
+        opticalDepth: 14.5px;
+        framebufferDistortion: true;
     }
     fluid {
         incompressibility: true;
@@ -877,6 +1008,15 @@
         intensity: 0.42;
         focusHeight: 2.5px;
     }
+    resonance {
+        capillaryFrequency: 48Hz;
+        surfaceTension: 0.0728N;
+        coalescenceSnapIntensity: 0.85;
+        boundaryRestitution: 0.65;
+        hapticFeedback: true;
+        audioResonance: true;
+        decayTime: 65ms;
+    }
 }</textarea>
 
       <div class="compile-bar">
@@ -894,7 +1034,7 @@
     import { LGRLexer } from '../compiler/lexer.js';
     import { LGRParser } from '../compiler/parser.js';
     import { LGRAnalyzer } from '../compiler/analyzer.js';
-    import { RK4Spring1D, LGRGyroscopeController, LGROpticalDistortion } from '../physics/hydroEngine.js';
+    import { RK4Spring1D, LGRGyroscopeController, LGROpticalDistortion, LGRHydroResonanceEngine } from '../physics/hydroEngine.js';
     import { LGR_VERTEX_SHADER, LGR_FRAGMENT_SHADER } from '../shaders/opticalKernel.js';
 
     // =========================================================================
@@ -918,6 +1058,15 @@
     let opticalDepthValue = 14.5;
     let customGlassText = 'LIQUID GLASS REDI • CASSIEL';
     let textPatternMode = 'cassiel';
+
+    // Pilar 3 State: Audio-Haptic Fluid Hydro-Resonance
+    const resonanceEngine = new LGRHydroResonanceEngine({
+      capillaryFrequencyHz: 48.0,
+      surfaceTension: 0.0728,
+      coalescenceSnapIntensity: 0.85,
+      boundaryRestitution: 0.65,
+      decayTimeMs: 65.0,
+    });
 
     function compileLGRText(sourceText) {
       const lexer = new LGRLexer(sourceText);
@@ -1338,6 +1487,53 @@
           gyroController.sensitivity = mat.lighting.gyroSensitivity;
         }
 
+        // Sync Pilar 2 Optical Depth from compiled .lgr AST
+        if (typeof mat.optics.opticalDepth === 'number') {
+          opticalDepthValue = mat.optics.opticalDepth;
+          const sl = document.getElementById('sliderOptDepth');
+          if (sl) sl.value = opticalDepthValue;
+          const valEl = document.getElementById('valOptDepth');
+          if (valEl) valEl.textContent = `${opticalDepthValue.toFixed(1)} px`;
+          const telEl = document.getElementById('telOptDepth');
+          if (telEl) telEl.textContent = `d₀: ${opticalDepthValue.toFixed(1)}px`;
+          distortionEngine.opticalDepth = opticalDepthValue;
+        }
+
+        // Sync Pilar 3 Hydro-Resonance from compiled .lgr AST
+        if (mat.resonance) {
+          resonanceEngine.capillaryFrequencyHz = mat.resonance.capillaryFrequencyHz;
+          resonanceEngine.surfaceTension = mat.resonance.surfaceTension;
+          resonanceEngine.coalescenceSnapIntensity = mat.resonance.coalescenceSnapIntensity;
+          resonanceEngine.boundaryRestitution = mat.resonance.boundaryRestitution;
+          resonanceEngine.decayTimeMs = mat.resonance.decayTimeMs;
+
+          const slCap = document.getElementById('sliderCapFreq');
+          if (slCap) slCap.value = mat.resonance.capillaryFrequencyHz;
+          const valCap = document.getElementById('valCapFreq');
+          if (valCap) valCap.textContent = `${mat.resonance.capillaryFrequencyHz.toFixed(1)} Hz`;
+
+          const slTension = document.getElementById('sliderSurfaceTension');
+          if (slTension) slTension.value = mat.resonance.surfaceTension;
+          const valTension = document.getElementById('valSurfaceTension');
+          if (valTension) valTension.textContent = `${mat.resonance.surfaceTension.toFixed(4)} N/m`;
+
+          const slSnap = document.getElementById('sliderSnapIntensity');
+          if (slSnap) slSnap.value = mat.resonance.coalescenceSnapIntensity;
+          const valSnap = document.getElementById('valSnapIntensity');
+          if (valSnap) valSnap.textContent = mat.resonance.coalescenceSnapIntensity.toFixed(2);
+
+          const slDecay = document.getElementById('sliderDecayTime');
+          if (slDecay) slDecay.value = mat.resonance.decayTimeMs;
+          const valDecay = document.getElementById('valDecayTime');
+          if (valDecay) valDecay.textContent = `${mat.resonance.decayTimeMs.toFixed(0)} ms`;
+
+          const telCap = document.getElementById('telCapFreq');
+          if (telCap) {
+            const omega = (2 * Math.PI * mat.resonance.capillaryFrequencyHz).toFixed(1);
+            telCap.textContent = `f_cap: ${mat.resonance.capillaryFrequencyHz}Hz (ω=${omega} rad/s)`;
+          }
+        }
+
         // Update RK4 spring stiffness
         lensX.configure(mat.fluid.derivedRK4.stiffnessK, mat.fluid.derivedRK4.dampingC);
         lensY.configure(mat.fluid.derivedRK4.stiffnessK, mat.fluid.derivedRK4.dampingC);
@@ -1506,6 +1702,15 @@
         intensity: 0.42;
         focusHeight: 2.5px;
     }
+    resonance {
+        capillaryFrequency: 48Hz;
+        surfaceTension: 0.0728N;
+        coalescenceSnapIntensity: 0.85;
+        boundaryRestitution: 0.65;
+        hapticFeedback: true;
+        audioResonance: true;
+        decayTime: 65ms;
+    }
 }`;
         window.compileFromEditor();
       } else if (mode === 'diamond') {
@@ -1544,6 +1749,15 @@
         intensity: 0.55;
         focusHeight: 3.0px;
     }
+    resonance {
+        capillaryFrequency: 58Hz;
+        surfaceTension: 0.0950N;
+        coalescenceSnapIntensity: 0.95;
+        boundaryRestitution: 0.72;
+        hapticFeedback: true;
+        audioResonance: true;
+        decayTime: 75ms;
+    }
 }`;
         window.compileFromEditor();
       } else if (mode === 'apple') {
@@ -1554,6 +1768,110 @@
           '[MODE STANDAR APPLE] Dispersi Pelangi Cauchy DINONAKTIFKAN (Monokromatik), Kausik Jacobian DINONAKTIFKAN, Koalesensi Tetesan dikurangi.';
       }
     };
+
+    // PILAR 3: Audio-Haptic Hydro-Resonance Window Controls
+    window.toggleHapticFeedback = function() {
+      resonanceEngine.hapticEnabled = !resonanceEngine.hapticEnabled;
+      const btn = document.getElementById('btnHapticToggle');
+      if (btn) {
+        if (resonanceEngine.hapticEnabled) {
+          btn.classList.add('active');
+          btn.textContent = '📳 Haptic: AKTIF';
+        } else {
+          btn.classList.remove('active');
+          btn.textContent = '📳 Haptic: NONAKTIF';
+        }
+      }
+    };
+
+    window.toggleAudioResonance = function() {
+      resonanceEngine.audioEnabled = !resonanceEngine.audioEnabled;
+      const btn = document.getElementById('btnAudioToggle');
+      if (btn) {
+        if (resonanceEngine.audioEnabled) {
+          btn.classList.add('active');
+          btn.textContent = '🔊 Audio: AKTIF';
+        } else {
+          btn.classList.remove('active');
+          btn.textContent = '🔊 Audio: NONAKTIF';
+        }
+      }
+    };
+
+    window.triggerTestCoalescenceSnap = function() {
+      const snap = resonanceEngine.triggerCoalescenceSnap();
+      const el = document.getElementById('telResEvent');
+      if (el) el.textContent = `Event: 💧 Snap [${snap.pattern.join('-')}ms]`;
+      window.triggerDemoBounce();
+    };
+
+    window.triggerTestFlickRipple = function() {
+      const flick = resonanceEngine.triggerFlickRipple(0.75, 1150);
+      const el = document.getElementById('telResEvent');
+      if (el) el.textContent = `Event: 🌊 Flick [${flick.pattern.join('-')}ms]`;
+      lensScaleX.impulse(0.35);
+      lensScaleY.impulse(-0.25);
+    };
+
+    window.triggerTestBoundaryBounce = function() {
+      const bnc = resonanceEngine.triggerBoundaryBounce(850);
+      const el = document.getElementById('telResEvent');
+      if (el) el.textContent = `Event: 🛡️ Bounce [${bnc.pattern.join('-')}ms]`;
+      dockScaleX.impulse(0.32);
+      dockScaleY.impulse(-0.24);
+    };
+
+    // Pilar 3 Live Slider Listeners
+    const sliderCapFreq = document.getElementById('sliderCapFreq');
+    if (sliderCapFreq) {
+      sliderCapFreq.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        resonanceEngine.capillaryFrequencyHz = val;
+        document.getElementById('valCapFreq').textContent = `${val.toFixed(1)} Hz`;
+        const omega = (2.0 * Math.PI * val).toFixed(1);
+        document.getElementById('telCapFreq').textContent = `f_cap: ${val.toFixed(0)}Hz (ω=${omega} rad/s)`;
+        if (activeMaterial && activeMaterial.resonance) {
+          activeMaterial.resonance.capillaryFrequencyHz = val;
+          activeMaterial.resonance.omegaCapillary = 2.0 * Math.PI * val;
+        }
+      });
+    }
+
+    const sliderSurfaceTension = document.getElementById('sliderSurfaceTension');
+    if (sliderSurfaceTension) {
+      sliderSurfaceTension.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        resonanceEngine.surfaceTension = val;
+        document.getElementById('valSurfaceTension').textContent = `${val.toFixed(4)} N/m`;
+        if (activeMaterial && activeMaterial.resonance) {
+          activeMaterial.resonance.surfaceTension = val;
+        }
+      });
+    }
+
+    const sliderSnapIntensity = document.getElementById('sliderSnapIntensity');
+    if (sliderSnapIntensity) {
+      sliderSnapIntensity.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        resonanceEngine.coalescenceSnapIntensity = val;
+        document.getElementById('valSnapIntensity').textContent = val.toFixed(2);
+        if (activeMaterial && activeMaterial.resonance) {
+          activeMaterial.resonance.coalescenceSnapIntensity = val;
+        }
+      });
+    }
+
+    const sliderDecayTime = document.getElementById('sliderDecayTime');
+    if (sliderDecayTime) {
+      sliderDecayTime.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        resonanceEngine.decayTimeMs = val;
+        document.getElementById('valDecayTime').textContent = `${val.toFixed(0)} ms`;
+        if (activeMaterial && activeMaterial.resonance) {
+          activeMaterial.resonance.decayTimeMs = val;
+        }
+      });
+    }
 
     // Live Slider Listeners
     ['sliderIOR', 'sliderCauchy', 'sliderMarangoni', 'sliderRim'].forEach((id) => {
@@ -1826,6 +2144,34 @@
           restBadge.textContent = `IN-FLIGHT ELEVATION (${dSnellMag.toFixed(3)}x)`;
           restBadge.style.background = 'rgba(245, 158, 11, 0.20)';
           restBadge.style.color = '#FBBF24';
+        }
+
+        // Pilar 3: Live Audio-Haptic Fluid Hydro-Resonance Step & Telemetry
+        const activeVelX = Math.abs(vx) > Math.abs(dockSpringX.velocity) ? vx : dockSpringX.velocity;
+        const isRestLocked = (bounceAct < 0.003 && dBounceAct === 0.0 && Math.abs(activeVelX) < 1.0);
+        const resReport = resonanceEngine.step({
+          velocityX: activeVelX,
+          weber: Math.max(weber, dWeber),
+          coalescenceFactor: fusionPct / 100.0,
+          isResting1to1: isRestLocked,
+        });
+
+        document.getElementById('telKineticEnergy').textContent = `Ek: ${resReport.kineticEnergyMJ.toFixed(4)} mJ`;
+        const telResEvent = document.getElementById('telResEvent');
+        if (resReport.lastEvent && resReport.lastEvent !== 'none') {
+          if (resReport.lastEvent === 'coalescence_snap') {
+            telResEvent.textContent = 'Event: 💧 Coalescence Snap!';
+            telResEvent.style.color = '#34D399';
+          } else if (resReport.lastEvent === 'flick_ripple') {
+            telResEvent.textContent = 'Event: 🌊 Flick Riak';
+            telResEvent.style.color = '#38BDF8';
+          } else {
+            telResEvent.textContent = `Event: ${resReport.lastEvent}`;
+            telResEvent.style.color = '#FBBF24';
+          }
+        } else if (resReport.isRestingZero) {
+          telResEvent.textContent = 'Event: Diam (Invarian 1:1)';
+          telResEvent.style.color = '#94A3B8';
         }
       }
 

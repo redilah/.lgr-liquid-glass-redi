@@ -29,6 +29,9 @@ Dalam bahasa `.lgr`, angka dapat ditulis langsung bersama satuan fisikanya tanpa
 | **Spektrum Cahaya** | `nm` | `650nm`, `550nm`, `450nm` | Panjang gelombang elektromagnetik ($\lambda$) |
 | **Indeks Bias** | `ior` | `1.52ior`, `2.42ior` | Rasio kecepatan cahaya di vakum terhadap medium |
 | **Waktu / Respons** | `ms`, `s` | `350ms`, `0.38s` | Periode respons pegas teredam kritis |
+| **Frekuensi Akustik** | `Hz`, `hz` | `48Hz`, `65Hz` | Frekuensi getaran resonansi kapiler |
+| **Gaya / Tegangan** | `N` | `0.0728N` | Tegangan permukaan antarmuka fluida |
+| **Energi Kinetik** | `mJ`, `J` | `12.5mJ` | Energi kinetik gelombang mikro |
 
 ### 2.3. Vektor & Warna Optik
 - **Warna Heksadesimal**: `#FFFFFF`, `#F7EEE2`, `#D97706FF`
@@ -49,7 +52,7 @@ MaterialDecl   ::= "material" Identifier "{" BlockBody "}"
 SceneDecl      ::= "scene" Identifier "{" BlockBody "}"
 BlockBody      ::= (PropertyAssign | SubBlock)*
 SubBlock       ::= BlockType Identifier? "{" BlockBody "}"
-BlockType      ::= "optics" | "fluid" | "lighting" | "caustics" 
+BlockType      ::= "optics" | "fluid" | "lighting" | "caustics" | "resonance" | "haptics"
                  | "vessel" | "droplet" | "invariant" | "interaction"
 PropertyAssign ::= Identifier ":" Expression ";"
 Expression     ::= NumberWithUnit | String | Boolean | HexColor | FunctionCall | Identifier

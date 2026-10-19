@@ -552,3 +552,255 @@ export class LGROpticalDistortion {
   }
 }
 
+/**
+ * PILAR 3: LGR AUDIO-HAPTIC FLUID HYDRO-RESONANCE ENGINE
+ * Synchronizes fluid micro-dynamics, capillary wave frequency (omega_cap = sqrt(sigma/rho * k^3)),
+ * kinetic energy (Ek = 0.5 * m * v^2), and Marangoni droplet coalescence snap into tactile
+ * vibration pulses via navigator.vibrate / Android Haptic Waveforms and low-frequency WebAudio
+ * acoustic clicks.
+ *
+ * Invariants:
+ *   1. Zero-Regression Resting Invariant:
+ *      When droplets are at rest (v_x = 0, isResting1to1 = true), exactly 0 haptic pulses and
+ *      0 audio clicks are emitted.
+ *   2. Non-blocking & Crash-Resistant Fallback:
+ *      All hardware vibration and WebAudio context calls are strictly wrapped in try/catch.
+ *      On desktop browsers, headless Node.js testing, or devices without haptics, the engine
+ *      runs smoothly without throwing exceptions or blocking the render thread.
+ *   3. Marangoni Coalescence Snap:
+ *      When two liquid droplets touch and fuse (coalescenceFactor crosses threshold 0.5),
+ *      the release of surface energy triggers an impulsive double-pulse haptic transient [15, 20, 10] ms
+ *      and a synthetic resonant acoustic click.
+ */
+export class LGRHydroResonanceEngine {
+  constructor(options = {}) {
+    this.capillaryFrequencyHz = options.capillaryFrequencyHz ?? 48.0;
+    this.surfaceTension = options.surfaceTension ?? 0.0728; // N/m
+    this.coalescenceSnapIntensity = options.coalescenceSnapIntensity ?? 0.85;
+    this.boundaryRestitution = options.boundaryRestitution ?? 0.65;
+    this.hapticEnabled = options.hapticFeedback ?? true;
+    this.audioEnabled = options.audioResonance ?? true;
+    this.decayTimeMs = options.decayTimeMs ?? 65.0;
+    this.massMg = options.massMg ?? 0.12; // Virtual droplet mass in mg
+
+    // Waveform presets (durations in ms)
+    this.snapWaveformMs = options.snapWaveformMs ?? [15, 20, 10]; // Pulse, Pause, Pulse
+    this.bounceWaveformMs = options.bounceWaveformMs ?? [18];
+    this.flickWaveformMs = options.flickWaveformMs ?? [8];
+
+    // Derived Kelvin capillary wave angular frequency: omega = 2 * pi * f
+    this.omegaCapillary = Number((2.0 * Math.PI * this.capillaryFrequencyHz).toFixed(4));
+
+    // Internal state tracking
+    this.lastCoalescenceFactor = 0.0;
+    this.lastVelocityX = 0.0;
+    this.lastHapticTimestamp = 0;
+    this.lastAudioTimestamp = 0;
+    this.minIntervalMs = 40; // Debounce to prevent haptic saturation
+
+    // WebAudio synthetic context (lazy loaded on user interaction)
+    this._audioCtx = null;
+    this._audioMuted = false;
+  }
+
+  /**
+   * Computes droplet kinetic energy Ek = 0.5 * m * v^2 in microJoules (uJ) or milliJoules (mJ)
+   * @param {number} velocityPxPerSec Droplet linear velocity in px/s
+   * @param {number} massMg Droplet mass in mg (default 0.12 mg)
+   * @returns {number} Kinetic energy in mJ
+   */
+  computeKineticEnergyMJ(velocityPxPerSec, massMg = this.massMg) {
+    const vMPerSec = velocityPxPerSec / 1000.0; // Normalized velocity in m/s
+    const massKg = massMg * 1e-6; // Convert mg to kg
+    const energyJoules = 0.5 * massKg * (vMPerSec * vMPerSec);
+    // Return in mJ (1 J = 1000 mJ)
+    return Number((energyJoules * 1000.0).toFixed(6));
+  }
+
+  /**
+   * Computes theoretical Kelvin capillary wave frequency:
+   *   omega_cap = sqrt((sigma / rho) * k^3), where k = 2*pi / lambda
+   * @param {number} surfaceTension N/m (default 0.0728 N/m)
+   * @param {number} densityKgM3 kg/m^3 (default 1000 kg/m^3 for water/hydro-crystal)
+   * @param {number} contactWidthMm mm (default 5.8 mm for finger pad contact & meniscus edge)
+   * @returns {number} Frequency in Hz
+   */
+  static computeKelvinCapillaryFreq(surfaceTension = 0.0728, densityKgM3 = 1000.0, contactWidthMm = 5.8) {
+    const wavelengthM = Math.max(0.001, contactWidthMm * 1e-3);
+    const k = (2.0 * Math.PI) / wavelengthM;
+    const omega = Math.sqrt((surfaceTension / densityKgM3) * Math.pow(k, 3));
+    return Number((omega / (2.0 * Math.PI)).toFixed(2));
+  }
+
+  /**
+   * Triggers hardware haptic vibration via navigator.vibrate (non-blocking, try/catch protected)
+   */
+  triggerHaptic(patternMs) {
+    if (!this.hapticEnabled) return false;
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (now - this.lastHapticTimestamp < this.minIntervalMs) return false;
+        this.lastHapticTimestamp = now;
+        navigator.vibrate(patternMs);
+        return true;
+      }
+    } catch {
+      // Graceful fallback on unsupported or restricted environments
+    }
+    return false;
+  }
+
+  /**
+   * Synthesizes a real-time damped sinusoidal acoustic click using WebAudio
+   * s(t) = A0 * exp(-t / tau) * sin(2*pi*f*t)
+   */
+  triggerAudioClick(freqHz = this.capillaryFrequencyHz, durationMs = this.decayTimeMs, volume = 0.18) {
+    if (!this.audioEnabled || this._audioMuted) return false;
+    try {
+      if (typeof window === 'undefined') return false;
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtxClass) return false;
+
+      if (!this._audioCtx) {
+        this._audioCtx = new AudioCtxClass();
+      }
+
+      if (this._audioCtx.state === 'suspended') {
+        this._audioCtx.resume().catch(() => {});
+      }
+
+      const now = this._audioCtx.currentTime;
+      const osc = this._audioCtx.createOscillator();
+      const gain = this._audioCtx.createGain();
+
+      // Damped decay envelope
+      const durSec = Math.max(0.015, durationMs / 1000.0);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freqHz, now);
+      // Exponential micro-pitch downward slide for authentic hydro droplet acoustic
+      osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqHz * 0.72), now + durSec);
+
+      gain.gain.setValueAtTime(volume, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
+
+      osc.connect(gain);
+      gain.connect(this._audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + durSec);
+      return true;
+    } catch {
+      // Graceful fallback for headless or restricted environments
+    }
+    return false;
+  }
+
+  /**
+   * Triggers the Marangoni Coalescence Snap (impulsive tactile transient & acoustic snap)
+   */
+  triggerCoalescenceSnap(intensity = this.coalescenceSnapIntensity) {
+    const scale = Math.max(0.5, Math.min(1.5, intensity));
+    const scaledPattern = this.snapWaveformMs.map((d) => Math.round(d * scale));
+    const hapticFired = this.triggerHaptic(scaledPattern);
+    const audioFired = this.triggerAudioClick(this.capillaryFrequencyHz * 1.65, this.decayTimeMs * 1.1, 0.22 * scale);
+    return { event: 'coalescence_snap', hapticFired, audioFired, pattern: scaledPattern };
+  }
+
+  /**
+   * Triggers high-speed fluid flick ripple haptic & acoustic pulse
+   */
+  triggerFlickRipple(weber = 0.5, velocityX = 800) {
+    const scale = Math.max(0.4, Math.min(1.4, Math.abs(velocityX) / 1000.0));
+    const pattern = this.flickWaveformMs.map((d) => Math.max(4, Math.round(d * scale)));
+    const hapticFired = this.triggerHaptic(pattern);
+    const audioFired = this.triggerAudioClick(this.capillaryFrequencyHz, this.decayTimeMs * 0.65, 0.12 * scale);
+    return { event: 'flick_ripple', hapticFired, audioFired, pattern };
+  }
+
+  /**
+   * Triggers boundary wall rebound haptic & deep acoustic bump
+   */
+  triggerBoundaryBounce(velocityX = 500) {
+    const scale = Math.max(0.5, Math.min(1.3, this.boundaryRestitution));
+    const pattern = this.bounceWaveformMs.map((d) => Math.round(d * scale));
+    const hapticFired = this.triggerHaptic(pattern);
+    const audioFired = this.triggerAudioClick(Math.max(24, this.capillaryFrequencyHz * 0.75), this.decayTimeMs * 0.85, 0.16 * scale);
+    return { event: 'boundary_bounce', hapticFired, audioFired, pattern };
+  }
+
+  /**
+   * Advances the hydro-resonance engine by monitoring the current physics state.
+   * Enforces the Zero-Regression Resting Invariant.
+   * @param {object} physicsState State returned by LGRHydroPhysicsEngine.step()
+   * @returns {object} Telemetry report
+   */
+  step(physicsState) {
+    if (!physicsState) {
+      return {
+        lastEvent: 'none',
+        kineticEnergyMJ: 0.0,
+        capillaryFreqHz: this.capillaryFrequencyHz,
+        surfaceTension: this.surfaceTension,
+        hapticEmitted: false,
+        audioEmitted: false,
+        isRestingZero: true,
+      };
+    }
+
+    const vx = physicsState.velocityX ?? 0.0;
+    const coalescence = physicsState.coalescenceFactor ?? 0.0;
+    const isResting = (physicsState.isResting1to1 === true) || (Math.abs(vx) < 0.001 && coalescence === 0.0);
+
+    const ek = this.computeKineticEnergyMJ(vx);
+
+    // 1. Strict Resting Invariant: When at rest, zero events are emitted!
+    if (isResting) {
+      this.lastCoalescenceFactor = coalescence;
+      this.lastVelocityX = vx;
+      return {
+        lastEvent: 'none',
+        kineticEnergyMJ: 0.0,
+        capillaryFreqHz: this.capillaryFrequencyHz,
+        surfaceTension: this.surfaceTension,
+        hapticEmitted: false,
+        audioEmitted: false,
+        isRestingZero: true,
+      };
+    }
+
+    let emittedEvent = 'none';
+    let hapticEmitted = false;
+    let audioEmitted = false;
+
+    // 2. Marangoni Coalescence Trigger: Fired when two droplets fuse across 0.5 threshold
+    if (coalescence >= 0.5 && this.lastCoalescenceFactor < 0.5) {
+      const snap = this.triggerCoalescenceSnap(this.coalescenceSnapIntensity);
+      emittedEvent = snap.event;
+      hapticEmitted = snap.hapticFired;
+      audioEmitted = snap.audioFired;
+    }
+    // 3. Flick Ripple Trigger: High Weber number / rapid movement
+    else if (physicsState.weber > 0.45 && Math.abs(vx) > 750 && Math.abs(vx - this.lastVelocityX) > 200) {
+      const flick = this.triggerFlickRipple(physicsState.weber, vx);
+      emittedEvent = flick.event;
+      hapticEmitted = flick.hapticFired;
+      audioEmitted = flick.audioFired;
+    }
+
+    this.lastCoalescenceFactor = coalescence;
+    this.lastVelocityX = vx;
+
+    return {
+      lastEvent: emittedEvent,
+      kineticEnergyMJ: ek,
+      capillaryFreqHz: this.capillaryFrequencyHz,
+      surfaceTension: this.surfaceTension,
+      hapticEmitted,
+      audioEmitted,
+      isRestingZero: false,
+    };
+  }
+}
+
+

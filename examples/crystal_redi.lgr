@@ -41,6 +41,16 @@ material CrownCrystalRedi {
         intensity: 0.38;
         focusHeight: 2.5px;
     }
+
+    resonance {
+        capillaryFrequency: 48Hz;
+        surfaceTension: 0.0728N;
+        coalescenceSnapIntensity: 0.85;
+        boundaryRestitution: 0.65;
+        hapticFeedback: enabled;
+        audioResonance: enabled;
+        decayTime: 65ms;
+    }
 }
 
 material DiamondPrismRedi {
@@ -79,6 +89,16 @@ material DiamondPrismRedi {
         mode: analytical_jacobian;
         intensity: 0.48;
         focusHeight: 3.0px;
+    }
+
+    resonance {
+        capillaryFrequency: 58Hz;
+        surfaceTension: 0.0950N;
+        coalescenceSnapIntensity: 0.95;
+        boundaryRestitution: 0.72;
+        hapticFeedback: enabled;
+        audioResonance: enabled;
+        decayTime: 50ms;
     }
 }
 

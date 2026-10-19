@@ -42,6 +42,8 @@ const float LGR_OPTICAL_DEPTH    = 18.0000;
 const vec3  LGR_SNELL_KAPPA_RGB  = vec3(-0.583969, -0.586264, -0.590194);
 const float LGR_CAUSTIC_INT  = 0.4800;
 const vec3  LGR_TINT_COLOR   = vec3(1.0000, 1.0000, 1.0000);
+const float LGR_CAPILLARY_FREQ = 58.00;
+const float LGR_SURFACE_TENSION = 0.0950;
 
 float fresnelSchlick(float cosTheta, float F0) {
   float c = clamp(1.0 - cosTheta, 0.0, 1.0);

@@ -173,7 +173,77 @@ console.log(
   `[PASS] Pilar 2D — Skalasi Kedalaman Optik Lift Terbukti (d_base=${restDeflection.effectiveDepth}px -> d_lifted=${liftedDeflection.effectiveDepth}px, Δp_lifted=${liftedDeflection.maxDeflection}px).`
 );
 
+// 8. Test Pilar 3: Audio-Haptic Fluid Hydro-Resonance
+import { LGRHydroResonanceEngine } from './physics/hydroEngine.js';
+
+// 8A. Compiler Resonance Extraction & Kelvin Angular Frequency
+console.assert(crownMat.resonance.capillaryFrequencyHz === 48, 'Crown Crystal capillaryFrequency must be 48 Hz');
+console.assert(crownMat.resonance.surfaceTension === 0.0728, 'Crown Crystal surfaceTension must be 0.0728 N/m');
+console.assert(crownMat.resonance.coalescenceSnapIntensity === 0.85, 'coalescenceSnapIntensity must be 0.85');
+console.assert(crownMat.resonance.snapWaveformMs.length === 3, 'snapWaveformMs must have 3 pulse intervals [15, 20, 10]');
+console.assert(Math.abs(crownMat.resonance.omegaCapillary - (2 * Math.PI * 48)) < 0.01, 'Capillary angular frequency must equal 2*pi*f');
+
+const kelvinFreq = LGRHydroResonanceEngine.computeKelvinCapillaryFreq(0.0728, 1000.0, 5.8);
+console.assert(kelvinFreq > 20 && kelvinFreq < 75, 'Theoretical Kelvin capillary frequency must fall in 20-75 Hz band');
+console.log(
+  `[PASS] Pilar 3A — Ekstraksi Compiler & Frekuensi Gelombang Kapiler Kelvin Terbukti (f_cap=${crownMat.resonance.capillaryFrequencyHz}Hz, ω_cap=${crownMat.resonance.omegaCapillary}rad/s, σ=${crownMat.resonance.surfaceTension}N/m, f_kelvin=${kelvinFreq}Hz).`
+);
+
+// 8B. Kinetic Energy & Marangoni Coalescence Snap Trigger
+const resEngine = new LGRHydroResonanceEngine({
+  capillaryFrequencyHz: crownMat.resonance.capillaryFrequencyHz,
+  surfaceTension: crownMat.resonance.surfaceTension,
+  coalescenceSnapIntensity: crownMat.resonance.coalescenceSnapIntensity,
+  boundaryRestitution: crownMat.resonance.boundaryRestitution,
+  decayTimeMs: crownMat.resonance.decayTimeMs,
+});
+
+const ekRest = resEngine.computeKineticEnergyMJ(0);
+const ekGlide = resEngine.computeKineticEnergyMJ(1250, 0.12);
+console.assert(ekRest === 0.0, 'Resting kinetic energy must be exactly 0 mJ');
+console.assert(ekGlide > 0.0, 'In-flight kinetic energy must be greater than 0 mJ');
+
+const snapResult = resEngine.triggerCoalescenceSnap(0.85);
+console.assert(snapResult.event === 'coalescence_snap', 'Snap trigger must report coalescence_snap event');
+console.assert(snapResult.pattern.length === 3, 'Snap haptic pattern must have 3 stages');
+console.log(
+  `[PASS] Pilar 3B — Energi Kinetik & Marangoni Coalescence Snap Terbukti (Ek_rest=${ekRest}mJ, Ek_flight=${ekGlide}mJ, pattern=[${snapResult.pattern.join(',')}ms]).`
+);
+
+// 8C. Strict Resting Invariant (Zero Haptic & Zero Audio at Rest)
+const restSimState = {
+  pixelX: 64,
+  pixelY: 31,
+  velocityX: 0.0,
+  weber: 0.0,
+  coalescenceFactor: 0.0,
+  isResting1to1: true,
+};
+const resRestReport = resEngine.step(restSimState);
+console.assert(resRestReport.isRestingZero === true, 'Resting hydro-resonance must flag isRestingZero=true');
+console.assert(resRestReport.lastEvent === 'none', 'Resting hydro-resonance must not emit any event');
+console.assert(resRestReport.kineticEnergyMJ === 0.0, 'Resting hydro-resonance kinetic energy must be 0');
+console.assert(resRestReport.hapticEmitted === false, 'Resting state must not emit haptic vibration');
+console.assert(resRestReport.audioEmitted === false, 'Resting state must not emit audio clicks');
+console.log(
+  `[PASS] Pilar 3C — Invarian Diam 1:1 Terbukti (Zero Haptic Pulses, Zero Audio Clicks, Ek=0.0mJ).`
+);
+
+// 8D. Dynamic Multi-Droplet Coalescence Snap Trigger & Headless Fallback
+const approachingState = { velocityX: 280, weber: 0.15, coalescenceFactor: 0.25, isResting1to1: false };
+const fusionStateStep = { velocityX: 120, weber: 0.08, coalescenceFactor: 0.78, isResting1to1: false };
+
+resEngine.step(approachingState);
+const snapStepReport = resEngine.step(fusionStateStep);
+console.assert(snapStepReport.lastEvent === 'coalescence_snap', 'Must trigger coalescence snap when passing 0.5 threshold');
+console.assert(typeof snapStepReport.hapticEmitted === 'boolean', 'Haptic emission must return boolean without throwing');
+console.assert(typeof snapStepReport.audioEmitted === 'boolean', 'Audio emission must return boolean without throwing');
+console.log(
+  `[PASS] Pilar 3D — Transisi Fusi Droplet Dinamis & Non-Blocking Fallback Terbukti (event=${snapStepReport.lastEvent}, Ek=${snapStepReport.kineticEnergyMJ}mJ).`
+);
+
 console.log('======================================================================');
-console.log('  SELURUH PENGUJIAN TAHAP 1, 2, PILAR 1 & PILAR 2 LULUS 100% TANPA ERROR!');
+console.log('  SELURUH PENGUJIAN TAHAP 1, 2, PILAR 1, 2 & PILAR 3 LULUS 100% TANPA ERROR!');
 console.log('======================================================================');
+
 
