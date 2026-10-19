@@ -57,6 +57,10 @@ uniform float u_beyondApple;    // 0.0 = Apple Standard, 1.0 = LGR Beyond-Apple
 uniform vec3 u_lightPos;        // 3D Physical Light Vector (Lx, Ly, Lz) from Gyroscope
 uniform vec2 u_gyroTilt;        // Normalized 2D Hydro-Gravity Tilt (gx, gy)
 
+// Pilar 2: True Dynamic Framebuffer Optical Distortion Uniforms
+uniform float u_opticalDepth;   // Thickness / distance d0 from lens to scene floor plane (default 14.5px)
+uniform float u_distortActive;  // 1.0 = Active Snellius Framebuffer Distortion, 0.0 = Flat Pass-Through
+
 float fresnelSchlick(float cosTheta, float F0) {
   float c = clamp(1.0 - cosTheta, 0.0, 1.0);
   float c2 = c * c;
@@ -181,26 +185,41 @@ void main() {
   vec3 I = vec3(0.0, 0.0, -1.0);
 
   // 3. Hardware Snell's Law Refraction & Cauchy Tri-Band Chromatic Dispersion
-  // In Apple Standard Mode (u_beyondApple == 0), all 3 channels use monochromatic green eta.
-  // In LGR Beyond-Apple Mode (u_beyondApple == 1), R, G, B bend at their true Cauchy wavelengths!
+  // Formula Snellius: Delta p(lambda) = d_eff * ((n_air - n_glass(lambda)) / n_glass(lambda)) * grad(z)
+  //                                  = d_eff * (activeEta(lambda) - 1.0) * grad(z)
   vec3 activeEta = mix(vec3(u_etaRGB.g), u_etaRGB, u_beyondApple);
 
   vec3 R_red   = refract(I, N, activeEta.r);
   vec3 R_green = refract(I, N, activeEta.g);
   vec3 R_blue  = refract(I, N, activeEta.b);
 
-  // Optical thickness displacement: zero at rest in center (1:1 invariant), strong lens bending at meniscus wall
-  float rimRefractPower = (1.0 - tRim) * (14.5 + u_glassLift * 8.0);
+  float optDepth = (u_opticalDepth > 0.1) ? u_opticalDepth : 14.5;
+  float effDepth = optDepth * (1.0 + u_glassLift * 0.55);
+
+  // Surface gradient from analytical normal: grad(z) = -N.xy / max(0.25, N.z)
+  vec2 gradZ = -N.xy / max(0.25, N.z);
+
+  // Snellius gradient deflection vector: Delta p = d_eff * kappa * grad(z)
+  vec3 kappaRGB = activeEta - vec3(1.0); // ((1 - n) / n)
+  vec2 snellDeltaG = effDepth * kappaRGB.g * gradZ;
+
+  // Center magnification offset (during in-flight bounce/glide)
   float centerMagScale = 1.0 / max(1.0, u_snellMag);
   vec2 centerMagOffset = (fragPx - u_bubblePos) * (centerMagScale - 1.0);
 
-  // Sample the background scene along the 3 refracted spectral rays
-  // Boost spectral separation in the steep meniscus wall so crystal rainbow dispersion is vividly visible
-  float dispersionBoost = 1.0 + u_beyondApple * (1.0 - tRim) * 5.2;
-  vec2 deltaG = R_green.xy * rimRefractPower + centerMagOffset;
-  vec2 deltaR = deltaG + (R_red.xy - R_green.xy) * rimRefractPower * dispersionBoost;
-  vec2 deltaB = deltaG + (R_blue.xy - R_green.xy) * rimRefractPower * dispersionBoost;
+  // Wall displacement boost along steep meniscus rim
+  float rimRefractPower = (1.0 - tRim) * (effDepth * 0.85);
+  float distortSwitch = (u_distortActive < -0.5) ? 1.0 : clamp(u_distortActive, 0.0, 1.0);
+  vec2 deltaG = (snellDeltaG + R_green.xy * rimRefractPower + centerMagOffset) * distortSwitch;
 
+  // Cauchy dispersion separation across R and B channels
+  float dispersionBoost = 1.0 + u_beyondApple * (1.0 - tRim) * 4.5;
+  vec2 deltaR = deltaG + (effDepth * (kappaRGB.r - kappaRGB.g) * gradZ + (R_red.xy - R_green.xy) * rimRefractPower) * dispersionBoost * u_beyondApple * distortSwitch;
+  vec2 deltaB = deltaG + (effDepth * (kappaRGB.b - kappaRGB.g) * gradZ + (R_blue.xy - R_green.xy) * rimRefractPower) * dispersionBoost * u_beyondApple * distortSwitch;
+
+  // Resting 1:1 Invariant Guard:
+  // When at rest in the center of the lens (tRim -> 1.0, gradZ -> 0, snellMag == 1.0):
+  // deltaG, deltaR, deltaB == 0.0px exactly, delivering 100% sharp text with zero blur!
   vec2 uvR = clamp((fragPx + deltaR) / u_resolution, 0.001, 0.999);
   vec2 uvG = clamp((fragPx + deltaG) / u_resolution, 0.001, 0.999);
   vec2 uvB = clamp((fragPx + deltaB) / u_resolution, 0.001, 0.999);

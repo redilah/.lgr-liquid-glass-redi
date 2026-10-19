@@ -23,6 +23,8 @@ uniform float u_glassLift;
 uniform float u_tiltX;
 uniform float u_weber;
 uniform float u_shear;
+uniform vec3 u_lightPos;
+uniform vec2 u_gyroTilt;
 
 // Compile-Time Baked Optical Constants (CrownCrystalRedi)
 const float LGR_IOR_BASE     = 1.520000;
@@ -36,6 +38,8 @@ const float LGR_KEY_EXP      = 54.00;
 const float LGR_CROWN_EXP    = 14.00;
 const float LGR_RIM_EXP      = 34.00;
 const float LGR_FLOW_EXP     = 22.00;
+const float LGR_OPTICAL_DEPTH    = 14.5000;
+const vec3  LGR_SNELL_KAPPA_RGB  = vec3(-0.339985, -0.342105, -0.345759);
 const float LGR_CAUSTIC_INT  = 0.3800;
 const vec3  LGR_TINT_COLOR   = vec3(1.0000, 0.9922, 0.9725);
 
@@ -97,7 +101,7 @@ void main() {
 
   float barEdgeAA = 1.0 - smoothstep(0.0, 1.2, distBar);
   float barTopLip = (1.0 - smoothstep(0.0, 1.8, fragPx.y - 0.5)) * 0.40;
-  float causticTrack = exp(-pow(abs(fragPx.x - u_bubblePos.x) / 44.0, 2.0));
+  float causticTrack = exp(-pow(abs(fragPx.x - u_bubblePos.x - u_gyroTilt.x * 16.0) / 44.0, 2.0));
   float barCausticGleam = barTopLip * (0.80 + causticTrack * 1.20);
   float barBottomGleam = (1.0 - smoothstep(0.0, 1.5, u_resolution.y - 0.5 - fragPx.y)) * 0.22;
   float barBevel = (1.0 - smoothstep(0.0, 1.2, -distBar)) * 0.30;
@@ -116,12 +120,14 @@ void main() {
     return;
   }
 
-  // 3. Analytical Jacobian Forward Ray Caustic Focusing
+  // 3. Analytical Jacobian Forward Ray Caustic Focusing + Pilar 1 Gyro Sweep
   if (dist > 0.45) {
-    vec2 causticRel = (fragPx - u_bubblePos) - vec2(-u_tiltX * 1.8, 1.5 + u_glassLift * 2.50);
+    vec2 gyroCausticShift = vec2(u_gyroTilt.x * 5.2, u_gyroTilt.y * 4.5);
+    vec2 causticRel = (fragPx - u_bubblePos) - vec2(-u_tiltX * 1.8, 1.5 + u_glassLift * 2.50) - gyroCausticShift;
     float cDist = capsuleSDF(causticRel, bPill, rPill);
     float jacobianFocus = 1.0 / max(0.28, 1.0 - 0.42 * exp(-abs(cDist) * 0.45));
-    float causticAlpha = exp(-pow(max(0.0, cDist - 0.8) * 0.35, 2.0)) * (LGR_CAUSTIC_INT * u_glassLift * jacobianFocus * 0.55) * smoothstep(14.0, 0.6, dist);
+    float gyroCausticBoost = clamp(length(u_gyroTilt) * 0.40, 0.0, 0.45);
+    float causticAlpha = exp(-pow(max(0.0, cDist - 0.8) * 0.35, 2.0)) * (LGR_CAUSTIC_INT * (0.35 + u_glassLift * 0.65 + gyroCausticBoost) * jacobianFocus * 0.55) * smoothstep(14.0, 0.6, dist);
     vec3 causticCol = vec3(1.0, 0.992, 0.972);
     float combAlpha = clamp(barAlpha + causticAlpha, 0.0, 1.0);
     vec3 combCol = mix(barCol, causticCol, causticAlpha / max(0.001, combAlpha));
@@ -147,7 +153,8 @@ void main() {
   float meniscusSlope = oneMinusT / max(0.20, zRim);
   vec2 domeCoord = q / max(vec2(1.0), u_bubbleHalfSize);
   vec2 N_xy = grad2D * meniscusSlope * (0.68 + u_glassLift * 0.24) + domeCoord * (0.20 + u_glassActive * 0.10);
-  N_xy.x -= u_tiltX * 0.22 * (0.4 + 0.6 * tRim);
+  N_xy.x -= (u_tiltX * 0.22 + u_gyroTilt.x * 0.20) * (0.4 + 0.6 * tRim);
+  N_xy.y -= (u_gyroTilt.y * 0.20) * (0.4 + 0.6 * tRim);
   vec3 N = normalize(vec3(N_xy.x, N_xy.y, 1.0));
   vec3 V = vec3(0.0, 0.0, 1.0);
   vec3 I = vec3(0.0, 0.0, -1.0);
@@ -165,7 +172,7 @@ void main() {
   ) * rimMask;
 
   // Spectral separation vector creates micro-prismatic diamond flare on edges
-  float dispersionDelta = length(R_blue.xy - R_red.xy) * 18.0 * (0.5 + 0.5 * abs(u_tiltX) + u_weber);
+  float dispersionDelta = length(R_blue.xy - R_red.xy) * 18.0 * (0.5 + 0.5 * abs(u_tiltX) + u_weber + length(u_gyroTilt) * 0.35);
   vec3 prismaticFlare = vec3(
     smoothstep(0.05, 0.45, R_red.x - R_green.x),
     smoothstep(0.02, 0.35, abs(R_green.y - R_blue.y)),
@@ -174,12 +181,15 @@ void main() {
 
   float fresnel = fresnelSchlick(clamp(dot(N, V), 0.0, 1.0), LGR_FRESNEL_F0);
 
-  // 6. 4-Light Studio PBR Specular Highlights
-  vec3 L_key = normalize(vec3(-u_tiltX * 0.42, -0.74 - u_glassLift * 0.10, 0.66));
+  // 6. 4-Light Studio PBR Specular Highlights (with Pilar 1 Gyroscope Light Vector)
+  vec3 defaultLight = vec3(0.0, -0.74, 0.66);
+  vec3 activeLight = length(u_lightPos) > 0.01 ? u_lightPos : defaultLight;
+  vec3 L_key = normalize(vec3(activeLight.x - u_tiltX * 0.42, activeLight.y - u_glassLift * 0.10, max(0.28, activeLight.z)));
   float specKey = pow(max(0.0, dot(N, normalize(L_key + V))), LGR_KEY_EXP) * (0.80 + u_glassLift * 0.22);
   float specCrown = pow(max(0.0, dot(N, normalize(L_key + V))), LGR_CROWN_EXP) * (0.18 + (1.0 - u_glassActive) * 0.12) * (1.0 - smoothstep(-0.85, 0.05, domeCoord.y));
-  float specRim = pow(max(0.0, dot(N, normalize(vec3(u_tiltX * 0.28, 0.82, 0.54) + V))), LGR_RIM_EXP) * (0.48 + u_glassLift * 0.22);
-  float specFlow = pow(max(0.0, dot(N, normalize(vec3(sign(u_tiltX) * 0.84, -0.10, 0.52) + V))), LGR_FLOW_EXP) * abs(u_tiltX) * 0.54;
+  float specRim = pow(max(0.0, dot(N, normalize(vec3(-activeLight.x * 0.6 + u_tiltX * 0.28, 0.82 - activeLight.y * 0.25, 0.54) + V))), LGR_RIM_EXP) * (0.48 + u_glassLift * 0.22);
+  float flowActive = clamp(abs(u_tiltX) + length(u_gyroTilt) * 0.65, 0.0, 1.0);
+  float specFlow = pow(max(0.0, dot(N, normalize(vec3(sign(u_tiltX + u_gyroTilt.x + 1e-4) * 0.84, -0.10 + u_gyroTilt.y * 0.45, 0.52) + V))), LGR_FLOW_EXP) * flowActive * 0.54;
 
   float outerCrispRim = (1.0 - smoothstep(0.0, 1.75, -dist)) * (0.96 + u_glassLift * 0.04);
   float fresnelWall = smoothstep(0.48, 0.0, tRim) * fresnel * (1.6 + u_glassActive * 1.1);

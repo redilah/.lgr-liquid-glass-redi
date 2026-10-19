@@ -149,6 +149,20 @@ export class LGRAnalyzer {
       opticsProps.totalInternalReflection,
       true
     );
+    const opticalDepth = this.extractNumber(opticsProps.opticalDepth, 14.5);
+    const framebufferDistortion = this.extractBoolean(
+      opticsProps.framebufferDistortion,
+      true
+    );
+
+    // Pilar 2: Snell's Law Optical Deflection Gradient Factors
+    // kappa = (n_air - n_glass) / n_glass = (1.0 - n) / n = eta - 1.0
+    const snellDeflectionFactor = Number(((1.0 - n0) / n0).toFixed(6));
+    const spectralKappa = {
+      r: Number(((1.0 - nRed) / nRed).toFixed(6)),
+      g: Number(((1.0 - nGreen) / nGreen).toFixed(6)),
+      b: Number(((1.0 - nBlue) / nBlue).toFixed(6)),
+    };
 
     // 2. Fluid Mechanics & Hydro-Elastic Spring Constants
     const incompressibility = this.extractBoolean(
@@ -225,7 +239,7 @@ export class LGRAnalyzer {
     this.diagnostics.push({
       level: 'INFO',
       target: `material:${node.name}`,
-      message: `Dispersi Cauchy terkompilasi: nR=${nRed} (η=${etaRed}), nG=${nGreen} (η=${etaGreen}), nB=${nBlue} (η=${etaBlue}) | Abbe Vd=${abbeNumber} | Fresnel F0=${f0} | Sudut Kritis TIR=${criticalAngleDeg}° | Pegas RK4 (k=${springStiffnessK}, c=${springDampingC}) | Gyro Caustic Sweep (S=${gyroSensitivity})`,
+      message: `Dispersi Cauchy terkompilasi: nR=${nRed} (η=${etaRed}), nG=${nGreen} (η=${etaGreen}), nB=${nBlue} (η=${etaBlue}) | Abbe Vd=${abbeNumber} | Fresnel F0=${f0} | Sudut Kritis TIR=${criticalAngleDeg}° | Pegas RK4 (k=${springStiffnessK}, c=${springDampingC}) | Gyro Caustic Sweep (S=${gyroSensitivity}) | Snell Deflection (κ=[-0.340, -0.342, -0.346], d0=${opticalDepth}px)`,
     });
 
     return {
@@ -237,6 +251,10 @@ export class LGRAnalyzer {
         wavelengthsNm,
         spectralIndices: { r: nRed, g: nGreen, b: nBlue },
         spectralEta: { r: etaRed, g: etaGreen, b: etaBlue },
+        spectralKappa,
+        snellDeflectionFactor,
+        opticalDepth,
+        framebufferDistortion,
         fresnelF0: f0,
         criticalAngleRad,
         criticalAngleDeg,

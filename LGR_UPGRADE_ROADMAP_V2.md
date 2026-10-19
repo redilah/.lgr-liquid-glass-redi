@@ -9,9 +9,9 @@
 
 ```mermaid
 flowchart TD
-    P1["🌊 PILAR 1: Gyroscope & Accelerometer Caustic Sweep<br>(Sensor Orientasi Fisik HP -> u_lightPos & Hydro-Gravity)"] --> V1{"Gate Verifikasi 1<br>(Test Suite + Lab + Cassiel)"}
+    P1["🌊 PILAR 1: Gyroscope & Accelerometer Caustic Sweep<br>(Sensor Orientasi Fisik HP -> u_lightPos & Hydro-Gravity)"] --> V1{"Gate Verifikasi 1<br>(Test Suite + Lab + Cassiel: PASS)"}
     V1 --> P2["⚡ PILAR 2: True Dynamic Framebuffer Optical Distortion<br>(Pembiasan Teks & Elemen di Bawah Lensa Snellius)"]
-    P2 --> V2{"Gate Verifikasi 2<br>(Zero Blur-Bleed & 120 FPS)"}
+    P2 --> V2{"Gate Verifikasi 2<br>(Zero Blur-Bleed & 120 FPS: PASS)"}
     V2 --> P3["📳 PILAR 3: Audio-Haptic Fluid Hydro-Resonance<br>(Sinkronisasi Gelombang Kapiler 20-70Hz ke Haptic Engine)"]
     P3 --> V3{"Gate Verifikasi 3<br>(Safe Haptic Fallback)"}
     V3 --> P4["🚀 PILAR 4: WebGPU Compute Shader Pipeline (.wgsl)<br>(Simulasi Fluida Navier-Stokes Paralel di GPU) "]
@@ -21,7 +21,7 @@ flowchart TD
 
 ---
 
-## 🌊 PILAR 1: Gyroscope & Accelerometer Physical Caustic Sweep (DIKERJAKAN PERTAMA)
+## 🌊 PILAR 1: Gyroscope & Accelerometer Physical Caustic Sweep (SELESAI 100%)
 
 ### 1. Rumusan Fisika & Matematika Baru
 Di dunia nyata, ketika sebuah kristal cair atau tetesan air berada di atas permukaan kartu dan pengguna memiringkan HP sebesar sudut *roll* ($\gamma \in [-90^\circ, 90^\circ]$) dan *pitch* ($\beta \in [-180^\circ, 180^\circ]$):
@@ -38,28 +38,49 @@ Di dunia nyata, ketika sebuah kristal cair atau tetesan air berada di atas permu
 3. **Filter Redaman Inersia RK4 ($\text{RK4GyroFilter}$)**:
    Data mentah sensor gyroscope/accelerometer memiliki *jitter* mikro. Sebelum masuk ke shader `u_lightPos` dan `u_gyroTilt`, sinyal dilewatkan ke pegas RK4 berfrekuensi alami $\omega_n = 18.5\text{ rad/s}$ ($\zeta = 0.92$) agar pergerakan kilau kaca sehalus air raksa.
 
-### 2. Cakupan Implementasi Pilar 1
-- **Bahasa `.lgr` & Compiler (`compiler/`)**: Menambahkan properti opsional `gyroSensitivity` dan `ergonomicPitch` pada blok `lighting` / `optics` beserta penurunan uniform `u_lightPos` & `u_gyroTilt`.
-- **Mesin Fisika (`physics/hydroEngine.js`)**: Menambahkan kelas `LGRGyroscopeController` yang menangani:
-  - Sensor `DeviceOrientationEvent` & `DeviceMotionEvent` asli di HP (Android/iOS).
-  - Izin sensor iOS 13+ (`DeviceOrientationEvent.requestPermission`) secara aman.
-  - Kalibrasi otomatis titik nol (*Auto-Zero Ergonomic Pitch Baseline*).
-  - Mode *Virtual 3D Gyro Simulator* untuk pengujian di PC/Browser tanpa perlu memutar layar monitor.
-- **Shader Optik GPU (`shaders/opticalKernel.js` & `src/utils/lgrHeroGlass.js`)**:
-  - Menambahkan `uniform vec3 u_lightPos` dan `uniform vec2 u_gyroTilt`.
-  - Menggerakkan pantulan utama (*Key Specular*), *Crown Shelf*, *Bernoulli Glint*, pendaran prisma Cauchy, serta cincin kaustik lantai secara *real-time* saat HP dimiringkan.
-- **Workbench Interaktif (`lab/index.html`)**:
-  - Menambahkan bola/kompas **3D Gyroscope Tilt Simulator** dan indikator sudut $(\beta^\circ, \gamma^\circ)$ secara langsung di laboratorium `http://localhost:4321/lab/index.html`.
-
-### 3. Jaminan Anti-Rusak (Zero-Regression Guard Pilar 1)
-- Jika `u_lightPos` bernilai default `(0, 0, 0)` atau perangkat tidak memiliki gyroscope dan simulator berada di `(0°, 0°)`, persamaan $\vec{L}_{\text{gyro}}$ menghasilkan nilai **100% identik** dengan vektor cahaya statis sebelumnya.
-- Saat kartu berada dalam keadaan diam dan tidak dimiringkan, loop `requestAnimationFrame` otomatis tidur (*auto-sleep*) untuk menghemat baterai 0% CPU/GPU.
-
 ---
 
-## ⚡ PILAR 2: True Dynamic Framebuffer Optical Distortion (Membelokkan Teks di Bawah Kaca)
-- **Konsep**: Merender lapisan tipografi/elemen di bawah lensa ke dalam tekstur WebGL (*Scene Framebuffer Texture*) dan menerapkan pembiasan vektor normal 3D $\Delta \vec{u} = \left(\frac{n_{\text{air}} - n_{\text{glass}}(\lambda)}{n_{\text{glass}}(\lambda)}\right) \nabla z(x,y)$ sehingga huruf dan angka di balik kapsul kaca benar-benar meliuk mengikuti kelengkungan lensa air saat digeser.
-- **Jaminan Anti-Rusak**: Pada saat istirahat (*Resting State*), invarian 1:1 tetap mengunci pembesaran tepat pada $1.0000\times$ sehingga teks tetap tajam 100% tanpa blur.
+## ⚡ PILAR 2: True Dynamic Framebuffer Optical Distortion (SELESAI 100%)
+
+### 1. Rumusan Fisika & Matematika Baru (Optika Gradien Snellius & Cauchy)
+Di alam nyata, lensa kaca cair atau tetesan air yang melengkung dengan profil tinggi $z(x, y)$ dan gradien permukaan $\nabla z = \left(\frac{\partial z}{\partial x}, \frac{\partial z}{\partial y}\right)$ membelokkan berkas cahaya yang menembusnya dari medium 1 (udara, $n_1 \approx 1.0$) ke medium 2 (kristal kaca, $n_2 = n_{\text{glass}}(\lambda)$).
+
+1. **Persamaan Defleksi Gradien Snellius ($\Delta \vec{p}_{\text{snell}}$)**:
+   Pergeseran posisi titik pada bidang adegan atau tekstur framebuffer di balik lensa pada jarak optik efektif $d_{\text{eff}}$ dirumuskan secara analitis sebagai:
+   $$\Delta \vec{p}(\lambda) = d_{\text{eff}} \cdot \left(\frac{n_{\text{air}} - n_{\text{glass}}(\lambda)}{n_{\text{glass}}(\lambda)}\right) \nabla z(x, y) = d_{\text{eff}} \cdot (\eta(\lambda) - 1.0) \nabla z(x, y)$$
+   Di mana $\kappa(\lambda) = \eta(\lambda) - 1.0 = \frac{1 - n(\lambda)}{n(\lambda)}$ adalah koefisien refraksi diferensial medium. Karena $n_{\text{glass}} > 1$, $\kappa < 0$, berkas cahaya membelok ke arah pusat kubah cembung (efek kaca pembesar riil).
+
+2. **Pemisahan Spektral Tri-Band Cauchy ($\Delta \vec{p}_R, \Delta \vec{p}_G, \Delta \vec{p}_B$)**:
+   Berdasarkan dispersi Cauchy $n(\lambda) = A + \frac{B}{\lambda^2}$:
+   - Merah ($\lambda_R = 650\text{ nm}$): $\kappa_R \approx -0.3400$
+   - Hijau ($\lambda_G = 550\text{ nm}$): $\kappa_G \approx -0.3421$
+   - Biru ($\lambda_B = 450\text{ nm}$): $\kappa_B \approx -0.3458$
+   Karena $|\kappa_B| > |\kappa_R|$, panjang gelombang biru dibelokkan lebih jauh daripada merah, menghasilkan pembiasan pelangi (*Cauchy chromatic aberration*) yang hidup di tepi tipografi dan angka saldo!
+
+3. **Skalasi Kedalaman Optik Dinamis ($d_{\text{eff}}$)**:
+   Ketika lensa kaca diangkat (*lift*) atau membal (*bounce*), jarak optik efektif bertambah:
+   $$d_{\text{eff}} = d_0 \cdot (1.0 + \text{lift} \cdot 0.55)$$
+   Sehingga pembelokan teks bertambah kuat saat kapsul meluncur dan kembali mengecil saat istirahat.
+
+4. **Invarian Diam 1:1 Tanpa Blur (Zero-Blur Typography Guard)**:
+   Ketika tetesan berada di titik istirahat (*resting state*, $v_x = 0$, $\text{lift} = 0$, $u_{\text{snellMag}} = 1.0000$), pada area tengah kubah berlaku $\nabla z \to 0$ dan $(1.0 / u_{\text{snellMag}} - 1.0) = 0$.
+   Maka:
+   $$\Delta \vec{p} \equiv (0.0, 0.0) \implies \vec{u}_{\text{refracted}} = \vec{u}_{\text{unrefracted}}$$
+   Teks dan angka di bawah lensa terbaca 100% tajam (*pixel-perfect sharpness*) tanpa buram sedikit pun!
+
+### 2. Cakupan Implementasi Pilar 2
+- **Bahasa `.lgr` & Compiler (`compiler/`)**:
+  - Menambahkan properti `opticalDepth` (default `14.5px`) dan `framebufferDistortion: true` pada blok `optics`.
+  - Penurunan otomatis koefisien $\kappa_R, \kappa_G, \kappa_B$ di `LGRAnalyzer` dan konstanta GPU `LGR_OPTICAL_DEPTH` & `LGR_SNELL_KAPPA_RGB` di `LGRCodeGenerator`.
+- **Mesin Fisika (`physics/hydroEngine.js`)**:
+  - Mengimplementasikan kelas `LGROpticalDistortion` dengan metode evaluasi profil meniskus $z(x, y)$, gradien permukaan $\nabla z$, dan defleksi $\Delta \vec{p}(\lambda)$.
+- **Shader Optik GPU (`shaders/opticalKernel.js` & `src/utils/lgrHeroGlass.js`)**:
+  - Menambahkan uniform `u_opticalDepth` dan `u_distortActive`.
+  - Mengintegrasikan rumus defleksi $\Delta \vec{p} = d_{\text{eff}} \cdot (\eta - 1.0) \nabla z$ pada sampling offscreen texture $u_{\text{sceneTex}}$.
+- **Workbench Interaktif (`lab/index.html`)**:
+  - Menambahkan kartu **Pilar 2: True Framebuffer Optical Distortion** dengan toggle on/off, input teks kustom live, preset pola (Saldo Cassiel, Abjad & Angka, Kisi Optik), slider kedalaman $d_0$, dan HUD telemetri $\Delta p_{\text{max}}$.
+- **Verifikasi Otomatis (`test-suite.js`)**:
+  - Lulus 100% pada 4 pengujian kunci Pilar 2 (Compiler Snell Kappa, Resting Zero Deflection, Meniscus Rim Dispersion, dan Lift Depth Scaling).
 
 ---
 

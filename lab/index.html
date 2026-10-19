@@ -520,6 +520,103 @@
       border: 1px solid rgba(255, 255, 255, 0.07);
       font-family: Consolas, monospace;
     }
+
+    /* PILAR 2: True Framebuffer Optical Distortion Card Styles */
+    .pilar2-card {
+      background: rgba(245, 158, 11, 0.06);
+      border: 1px solid rgba(245, 158, 11, 0.28);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pilar2-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pilar2-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #F59E0B;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pilar2-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pilar2-chip-btn {
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: rgba(245, 158, 11, 0.12);
+      color: #FEF3C7;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .pilar2-chip-btn:hover {
+      background: rgba(245, 158, 11, 0.25);
+    }
+
+    .pilar2-chip-btn.active {
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      color: #FFFFFF;
+      border-color: #FBBF24;
+      box-shadow: 0 3px 12px rgba(245, 158, 11, 0.35);
+    }
+
+    .pilar2-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pilar2-text-input {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 10px;
+      padding: 8px 12px;
+      color: #FFFFFF;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .pilar2-text-input:focus {
+      border-color: #F59E0B;
+    }
+
+    .pilar2-telemetry-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #CBD5E1;
+      background: rgba(9, 10, 15, 0.55);
+      padding: 7px 11px;
+      border-radius: 10px;
+      border: 1px solid rgba(245, 158, 11, 0.18);
+      font-family: Consolas, monospace;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
   </style>
 </head>
 <body>
@@ -711,6 +808,40 @@
         </div>
       </div>
 
+      <!-- PILAR 2: TRUE DYNAMIC FRAMEBUFFER OPTICAL DISTORTION -->
+      <div class="pilar2-card">
+        <div class="pilar2-header-row">
+          <div class="pilar2-title">⚡ Pilar 2: True Framebuffer Optical Distortion</div>
+          <div class="pilar2-actions">
+            <button class="pilar2-chip-btn active" id="btnDistortToggle" onclick="toggleOpticalDistortion()">⚡ Distorsi Snellius: AKTIF</button>
+            <button class="pilar2-chip-btn active" id="btnPatternCassiel" onclick="setTextPattern('cassiel')">💰 Saldo Cassiel</button>
+            <button class="pilar2-chip-btn" id="btnPatternAlpha" onclick="setTextPattern('alpha')">🔤 Abjad & Angka</button>
+            <button class="pilar2-chip-btn" id="btnPatternGrid" onclick="setTextPattern('grid')">📐 Kisi Optik</button>
+          </div>
+        </div>
+
+        <div class="pilar2-input-row">
+          <input type="text" id="inputGlassText" class="pilar2-text-input" value="LIQUID GLASS REDI • CASSIEL" placeholder="Ketik teks di balik lensa..." oninput="onGlassTextInput(this.value)" />
+        </div>
+
+        <div class="sliders-grid">
+          <div class="slider-row">
+            <div class="slider-top">
+              <span>Kedalaman Optik Kaca (d₀)</span>
+              <span id="valOptDepth">14.5 px</span>
+            </div>
+            <input type="range" id="sliderOptDepth" min="4" max="36" step="0.5" value="14.5" />
+          </div>
+        </div>
+
+        <div class="pilar2-telemetry-bar">
+          <span id="telSnellDelta">Snellius Δp_max: 0.0px</span>
+          <span id="telOptDepth">d₀: 14.5px</span>
+          <span id="telDispersion">Dispersi Δλ: 0.00px</span>
+          <span id="telSharpness">Ketajaman: 100% Invarian 1:1</span>
+        </div>
+      </div>
+
       <div class="panel-header" style="margin-top: 4px;">
         <div class="panel-title">💻 Live Compiler Bahasa `.lgr` (`lgrc` In-Browser Engine)</div>
       </div>
@@ -763,7 +894,7 @@
     import { LGRLexer } from '../compiler/lexer.js';
     import { LGRParser } from '../compiler/parser.js';
     import { LGRAnalyzer } from '../compiler/analyzer.js';
-    import { RK4Spring1D, LGRGyroscopeController } from '../physics/hydroEngine.js';
+    import { RK4Spring1D, LGRGyroscopeController, LGROpticalDistortion } from '../physics/hydroEngine.js';
     import { LGR_VERTEX_SHADER, LGR_FRAGMENT_SHADER } from '../shaders/opticalKernel.js';
 
     // =========================================================================
@@ -776,6 +907,17 @@
       ergonomicPitchDeg: 35.0,
     });
     let gyroAutoOrbit = false;
+
+    // Pilar 2 State: Dynamic Framebuffer Optical Distortion
+    const distortionEngine = new LGROpticalDistortion({
+      refractiveIndex: 1.52,
+      cauchyB: 0.0052,
+      opticalDepth: 14.5,
+    });
+    let opticalDistortActive = true;
+    let opticalDepthValue = 14.5;
+    let customGlassText = 'LIQUID GLASS REDI • CASSIEL';
+    let textPatternMode = 'cassiel';
 
     function compileLGRText(sourceText) {
       const lexer = new LGRLexer(sourceText);
@@ -843,55 +985,105 @@
         ctx.stroke();
       }
 
-      // High-contrast UI cards & crisp typography underneath the glass
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.roundRect(28, 26, 250, 115, 16);
-      ctx.fill();
-      ctx.stroke();
+      // Render Dynamic Typography & Elements Underneath the Glass based on textPatternMode
+      if (textPatternMode === 'cassiel') {
+        // High-contrast UI cards & crisp typography underneath the glass
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(28, 24, 250, 116, 16);
+        ctx.fill();
+        ctx.stroke();
 
-      ctx.fillStyle = '#F59E0B';
-      ctx.font = '800 11px system-ui, sans-serif';
-      ctx.fillText('TOTAL SALDO AKTIF • CASSIEL', 44, 52);
+        ctx.fillStyle = '#F59E0B';
+        ctx.font = '800 11px system-ui, sans-serif';
+        ctx.fillText('TOTAL SALDO AKTIF • CASSIEL', 44, 50);
 
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '800 24px system-ui, sans-serif';
-      ctx.fillText('Rp 128.450.000', 44, 84);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '800 24px system-ui, sans-serif';
+        ctx.fillText('Rp 128.450.000', 44, 82);
 
-      ctx.fillStyle = '#34D399';
-      ctx.font = '700 12px system-ui, sans-serif';
-      ctx.fillText('▲ +24.8% Surplus Bulan Ini', 44, 112);
+        ctx.fillStyle = '#34D399';
+        ctx.font = '700 12px system-ui, sans-serif';
+        ctx.fillText('▲ +24.8% Surplus Bulan Ini', 44, 110);
 
-      // Right card
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
-      ctx.beginPath();
-      ctx.roundRect(width - 280, 26, 252, 115, 16);
-      ctx.fill();
-      ctx.stroke();
+        // Right card
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+        ctx.beginPath();
+        ctx.roundRect(width - 280, 24, 252, 116, 16);
+        ctx.fill();
+        ctx.stroke();
 
-      ctx.fillStyle = '#38BDF8';
-      ctx.font = '800 11px system-ui, sans-serif';
-      ctx.fillText('OPTICAL BENCHMARK • SNELL & CAUCHY', width - 264, 52);
+        ctx.fillStyle = '#38BDF8';
+        ctx.font = '800 11px system-ui, sans-serif';
+        ctx.fillText('OPTICAL BENCHMARK • SNELL & CAUCHY', width - 264, 50);
 
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '800 21px system-ui, sans-serif';
-      ctx.fillText('Refraksi Kristal 3D', width - 264, 82);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '800 20px system-ui, sans-serif';
+        ctx.fillText('Refraksi Kristal 3D', width - 264, 80);
 
-      ctx.fillStyle = '#E2E8F0';
-      ctx.font = '600 12px system-ui, sans-serif';
-      ctx.fillText('n(λ) = A + B/λ² • F0 = 0.0426', width - 264, 110);
+        ctx.fillStyle = '#E2E8F0';
+        ctx.font = '600 12px system-ui, sans-serif';
+        ctx.fillText('Δp = d₀·((n₁-n₂)/n₂)·∇z • F0=0.0426', width - 264, 108);
 
-      // Center large watermark text for testing lens magnification & chromatic dispersion
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 32px system-ui, sans-serif';
-      ctx.fillText('LIQUID GLASS REDI', width * 0.5, height * 0.62);
+        // Center large watermark text for testing lens magnification & chromatic dispersion
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '900 30px system-ui, sans-serif';
+        ctx.fillText(customGlassText, width * 0.5, height * 0.58);
 
-      ctx.fillStyle = '#CBD5E1';
-      ctx.font = '600 14px system-ui, sans-serif';
-      ctx.fillText('Geser lensa kaca melewati teks & garis ini untuk menguji pembiasan optik nyata', width * 0.5, height * 0.72);
+        // Financial account chips underneath glass
+        ctx.font = '700 13px system-ui, sans-serif';
+        ctx.fillStyle = '#FBBF24';
+        ctx.fillText('🏦 BCA: Rp 14.500.000    💼 GAJI: Rp 28.000.000    📱 JAGO: Rp 6.250.000', width * 0.5, height * 0.69);
+
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '600 12.5px system-ui, sans-serif';
+        ctx.fillText('Geser lensa kaca melewati teks & angka di atas untuk menguji pembelokan optik nyata (Snellius)', width * 0.5, height * 0.79);
+      } else if (textPatternMode === 'alpha') {
+        // High-density alphanumeric typography chart for inspecting micro-kerning and dispersion
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#F59E0B';
+        ctx.font = '900 32px monospace, system-ui';
+        ctx.fillText('0 1 2 3 4 5 6 7 8 9', width * 0.5, height * 0.28);
+
+        ctx.fillStyle = '#38BDF8';
+        ctx.font = '800 20px monospace, system-ui';
+        ctx.fillText('A B C D E F G H I J K L M N O P Q R S T U V W X Y Z', width * 0.5, height * 0.42);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '900 32px system-ui, sans-serif';
+        ctx.fillText(customGlassText, width * 0.5, height * 0.60);
+
+        ctx.fillStyle = '#34D399';
+        ctx.font = '700 15px monospace, system-ui';
+        ctx.fillText('Rp 999.888.777  •  $12,345.67  •  +99.9% SURPLUS  •  INVARIANT 1:1', width * 0.5, height * 0.74);
+
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '600 12px system-ui, sans-serif';
+        ctx.fillText('Batas huruf & angka meliuk mengikuti kelengkungan kubah air dengan pelangi Cauchy', width * 0.5, height * 0.84);
+      } else if (textPatternMode === 'grid') {
+        // Vernier optical coordinate grid & concentric rings
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 1.5;
+        const cx = width * 0.5;
+        const cy = height * 0.5;
+        for (let r = 25; r <= 220; r += 25) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '900 26px system-ui, sans-serif';
+        ctx.fillText(customGlassText, cx, cy - 14);
+
+        ctx.fillStyle = '#F59E0B';
+        ctx.font = '700 14px monospace';
+        ctx.fillText('RADIAL SNELL VECTOR FIELD: Δp = d₀ · ((1 - n)/n) · ∇z', cx, cy + 22);
+      }
 
       ctx.restore();
     }
@@ -944,7 +1136,7 @@
       'u_glassActive', 'u_glassLift', 'u_tiltX', 'u_weber', 'u_shear', 'u_snellMag',
       'u_etaRGB', 'u_fresnelF0', 'u_rimWidth', 'u_marangoniK',
       'u_pbrExponents', 'u_causticInt', 'u_tintColor', 'u_beyondApple',
-      'u_lightPos', 'u_gyroTilt'
+      'u_lightPos', 'u_gyroTilt', 'u_opticalDepth', 'u_distortActive'
     ].forEach(name => { uLocs[name] = gl.getUniformLocation(mainProgram, name); });
 
     // Stage 1 Physics Springs (Primary Freeform Lens + Center Coalescing Droplet)
@@ -1233,6 +1425,49 @@
       gyroController.resetNeutral();
     };
 
+    // Pilar 2: Dynamic Framebuffer Optical Distortion Callbacks
+    window.toggleOpticalDistortion = function() {
+      opticalDistortActive = !opticalDistortActive;
+      const btn = document.getElementById('btnDistortToggle');
+      if (btn) {
+        if (opticalDistortActive) {
+          btn.classList.add('active');
+          btn.textContent = '⚡ Distorsi Snellius: AKTIF';
+        } else {
+          btn.classList.remove('active');
+          btn.textContent = '⏸️ Distorsi Snellius: NONAKTIF';
+        }
+      }
+    };
+
+    window.setTextPattern = function(mode) {
+      textPatternMode = mode;
+      ['btnPatternCassiel', 'btnPatternAlpha', 'btnPatternGrid'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+      });
+      if (mode === 'cassiel') document.getElementById('btnPatternCassiel')?.classList.add('active');
+      if (mode === 'alpha') document.getElementById('btnPatternAlpha')?.classList.add('active');
+      if (mode === 'grid') document.getElementById('btnPatternGrid')?.classList.add('active');
+    };
+
+    window.onGlassTextInput = function(val) {
+      customGlassText = val || 'LIQUID GLASS REDI';
+    };
+
+    const sliderOptDepthEl = document.getElementById('sliderOptDepth');
+    if (sliderOptDepthEl) {
+      sliderOptDepthEl.addEventListener('input', (e) => {
+        opticalDepthValue = parseFloat(e.target.value);
+        document.getElementById('valOptDepth').textContent = `${opticalDepthValue.toFixed(1)} px`;
+        document.getElementById('telOptDepth').textContent = `d₀: ${opticalDepthValue.toFixed(1)}px`;
+        if (activeMaterial && activeMaterial.optics) {
+          activeMaterial.optics.opticalDepth = opticalDepthValue;
+        }
+        distortionEngine.opticalDepth = opticalDepthValue;
+      });
+    }
+
     window.selectPreset = function (mode) {
       document.querySelectorAll('.preset-pills .preset-btn').forEach(b => b.classList.remove('active'));
       if (mode === 'crown') {
@@ -1245,6 +1480,8 @@
         wavelengths: spectrum(650nm, 550nm, 450nm);
         meniscusRimWidth: 13.5px;
         totalInternalReflection: true;
+        opticalDepth: 14.5px;
+        framebufferDistortion: true;
     }
     fluid {
         incompressibility: true;
@@ -1281,6 +1518,8 @@
         wavelengths: spectrum(650nm, 550nm, 450nm);
         meniscusRimWidth: 16.5px;
         totalInternalReflection: true;
+        opticalDepth: 18.0px;
+        framebufferDistortion: true;
     }
     fluid {
         incompressibility: true;
@@ -1464,6 +1703,8 @@
         gl.uniform1f(uLocs.u_beyondApple, beyondAppleMode);
         gl.uniform3f(uLocs.u_lightPos, gyroState.lightPos[0], gyroState.lightPos[1], gyroState.lightPos[2]);
         gl.uniform2f(uLocs.u_gyroTilt, gyroState.gyroTilt[0], gyroState.gyroTilt[1]);
+        gl.uniform1f(uLocs.u_opticalDepth, opticalDepthValue);
+        gl.uniform1f(uLocs.u_distortActive, opticalDistortActive ? 1.0 : 0.0);
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -1552,6 +1793,29 @@
           `u_lightPos: (${gyroState.lightPos[0].toFixed(3)}, ${gyroState.lightPos[1].toFixed(3)}, +${gyroState.lightPos[2].toFixed(3)})`;
         document.getElementById('telCausticShift').textContent =
           `Caustic Δp: (${gyroState.causticShiftXY[0].toFixed(1)}px, ${gyroState.causticShiftXY[1].toFixed(1)}px)`;
+
+        // Pilar 2: Live Snellius Deflection & Chromatic Dispersion Telemetry
+        const defl = distortionEngine.computeDeflection(
+          (lensTilt.value + gyroState.gyroTilt[0] * 0.75) * 0.24 + (snellMag - 1.0) * 0.35,
+          gyroState.gyroTilt[1] * 0.24,
+          lensLift.value,
+          snellMag,
+          beyondAppleMode
+        );
+        const maxDp = opticalDistortActive ? (defl.maxDeflection + (snellMag - 1.0) * 14.5) : 0.0;
+        const dispSpread = opticalDistortActive ? defl.chromaticSpread : 0.0;
+
+        document.getElementById('telSnellDelta').textContent = `Snellius Δp_max: ${maxDp.toFixed(1)}px`;
+        document.getElementById('telDispersion').textContent = `Dispersi Δλ: ${dispSpread.toFixed(2)}px`;
+
+        const telSharpness = document.getElementById('telSharpness');
+        if (bounceAct < 0.003 && maxDp < 0.05) {
+          telSharpness.textContent = 'Ketajaman: 100% Invarian 1:1';
+          telSharpness.style.color = '#34D399';
+        } else {
+          telSharpness.textContent = `Ketajaman: Lensa Meliuk (${snellMag.toFixed(3)}x)`;
+          telSharpness.style.color = '#F59E0B';
+        }
 
         const restBadge = document.getElementById('restingBadge');
         if (dBounceAct === 0.0) {

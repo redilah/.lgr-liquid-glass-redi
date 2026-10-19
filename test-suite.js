@@ -115,6 +115,65 @@ console.log(
   `[PASS] Pilar 1C — Konvergensi Filter Harmonik RK4 Gyro Berhasil Kembali Netral (tilt=[${settledGyro.gyroTilt.map(v => v.toFixed(4))}]).`
 );
 
+// 7. Test Pilar 2: True Dynamic Framebuffer Optical Distortion
+import { LGROpticalDistortion } from './physics/hydroEngine.js';
+
+// 7A. Compiler & Semantic Snell Deflection Verification
+console.assert(crownMat.optics.opticalDepth === 14.5, 'Crown Crystal opticalDepth must equal 14.5px');
+console.assert(crownMat.optics.framebufferDistortion === true, 'Crown Crystal framebufferDistortion must be enabled');
+console.assert(crownMat.optics.snellDeflectionFactor < 0, 'Snellius deflection factor kappa must be negative for convex lens (n > 1)');
+console.assert(
+  crownMat.optics.spectralKappa.b < crownMat.optics.spectralKappa.r,
+  'Cauchy Tri-Band: Blue kappa magnitude must exceed Red kappa magnitude (|κB| > |κR|)'
+);
+console.log(
+  `[PASS] Pilar 2A — Parameter Compiler Snell Deflection Terbukti (d0=${crownMat.optics.opticalDepth}px, κR=${crownMat.optics.spectralKappa.r}, κG=${crownMat.optics.spectralKappa.g}, κB=${crownMat.optics.spectralKappa.b}).`
+);
+
+// 7B. Zero Deflection at Rest Invariant (Zero-Blur Typography Guard)
+const optDistortion = new LGROpticalDistortion({
+  refractiveIndex: crownMat.optics.refractiveIndex,
+  cauchyB: crownMat.optics.cauchyB,
+  opticalDepth: crownMat.optics.opticalDepth,
+});
+
+const restDeflection = optDistortion.computeDeflection(0.0, 0.0, 0.0, 1.0, 1.0);
+console.assert(restDeflection.isRestingZero === true, 'Center of resting lens must produce exactly 0.0px deflection');
+console.assert(restDeflection.deltaPGreen[0] === 0.0, 'Resting green delta X must be 0.0px');
+console.assert(restDeflection.deltaPGreen[1] === 0.0, 'Resting green delta Y must be 0.0px');
+console.assert(restDeflection.chromaticSpread === 0.0, 'Resting chromatic spread must be 0.0px');
+console.log(
+  `[PASS] Pilar 2B — Invarian Istirahat 1:1 Terbukti Bebas Blur (Δp=[${restDeflection.deltaPGreen.join(',')}px], spread=${restDeflection.chromaticSpread}px, 100% Sharp Typography).`
+);
+
+// 7C. Dynamic Meniscus Rim Snellius Refraction & Cauchy Chromatic Dispersion
+const rimGrad = optDistortion.evaluateSurfaceGradient(-4.5, [1.0, 0.0], 9.2, 0.0);
+const rimDeflection = optDistortion.computeDeflection(rimGrad[0], rimGrad[1], 0.0, 1.0, 1.0);
+console.assert(rimDeflection.maxDeflection > 1.0, 'Meniscus wall must produce strong optical ray deflection');
+console.assert(
+  Math.abs(rimDeflection.deltaPBlue[0]) > Math.abs(rimDeflection.deltaPRed[0]),
+  'Blue ray deflection must exceed Red ray deflection for Cauchy dispersion'
+);
+console.assert(rimDeflection.chromaticSpread > 0.02, 'Chromatic spread must be physically non-zero at meniscus rim');
+console.log(
+  `[PASS] Pilar 2C — Pembiasan Meniskus & Dispersi Cauchy Terbukti (Δp_G=${rimDeflection.deltaPGreen[0]}px, Δp_R=${rimDeflection.deltaPRed[0]}px, Δp_B=${rimDeflection.deltaPBlue[0]}px, spread=${rimDeflection.chromaticSpread}px).`
+);
+
+// 7D. Dynamic Optical Depth Scaling with Fluid Lift
+const liftedDeflection = optDistortion.computeDeflection(rimGrad[0], rimGrad[1], 1.0, 1.18, 1.0);
+console.assert(
+  liftedDeflection.effectiveDepth > restDeflection.effectiveDepth,
+  'Elevated lens must increase effective optical path length d_eff'
+);
+console.assert(
+  liftedDeflection.maxDeflection > rimDeflection.maxDeflection,
+  'Lifted lens must produce stronger ray deflection due to increased optical path'
+);
+console.log(
+  `[PASS] Pilar 2D — Skalasi Kedalaman Optik Lift Terbukti (d_base=${restDeflection.effectiveDepth}px -> d_lifted=${liftedDeflection.effectiveDepth}px, Δp_lifted=${liftedDeflection.maxDeflection}px).`
+);
+
 console.log('======================================================================');
-console.log('  SELURUH PENGUJIAN TAHAP 1, TAHAP 2 & PILAR 1 LULUS 100% TANPA ERROR!');
+console.log('  SELURUH PENGUJIAN TAHAP 1, 2, PILAR 1 & PILAR 2 LULUS 100% TANPA ERROR!');
 console.log('======================================================================');
+

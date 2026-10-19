@@ -454,3 +454,101 @@ export class LGRGyroscopeController {
     };
   }
 }
+
+/**
+ * PILAR 2: LGR OPTICAL DISTORTION & SNELL DEFLECTION ENGINE
+ * Computes exact physical ray displacement:
+ *   Delta p(lambda) = d0 * ((n_air - n_glass(lambda)) / n_glass(lambda)) * grad(z)
+ *                   = d0 * (eta(lambda) - 1.0) * grad(z)
+ * on an underlying planar scene or offscreen framebuffer texture.
+ *
+ * Invariants:
+ *   1. Zero Deflection at Rest: When at rest at the droplet center,
+ *      grad(z) -> 0 and magnification = 1.0000x => Delta p = 0.0px (100% sharp text, zero blur).
+ *   2. Cauchy Spectral Dispersion: Blue wavelengths bend stronger than Red wavelengths
+ *      (|kappa_blue| > |kappa_red|), creating authentic physical chromatic fringing.
+ *   3. Dynamic Optical Depth: Lift elevates the optical path length:
+ *      d_eff = d0 * (1.0 + lift * 0.55).
+ */
+export class LGROpticalDistortion {
+  constructor(options = {}) {
+    this.refractiveIndex = options.refractiveIndex ?? 1.52;
+    this.cauchyB = options.cauchyB ?? 0.0052;
+    this.opticalDepth = options.opticalDepth ?? 14.5;
+    this.wavelengths = options.wavelengths ?? [650, 550, 450]; // nm: Red, Green, Blue
+
+    const [lamR, lamG, lamB] = this.wavelengths.map((w) => w / 1000.0);
+    const n0 = this.refractiveIndex;
+    const cauchyA = n0 - this.cauchyB / (lamG * lamG);
+    this.nRed = Number((cauchyA + this.cauchyB / (lamR * lamR)).toFixed(6));
+    this.nGreen = Number(n0.toFixed(6));
+    this.nBlue = Number((cauchyA + this.cauchyB / (lamB * lamB)).toFixed(6));
+
+    // Snell deflection kappa factors: kappa = (1 - n) / n
+    this.kappaRed = Number(((1.0 - this.nRed) / this.nRed).toFixed(6));
+    this.kappaGreen = Number(((1.0 - this.nGreen) / this.nGreen).toFixed(6));
+    this.kappaBlue = Number(((1.0 - this.nBlue) / this.nBlue).toFixed(6));
+  }
+
+  /**
+   * Computes height z(x,y) of a physical meniscus dome in pixels
+   */
+  evaluateMeniscusHeight(distPx, rimWidthPx = 11.5, lift = 0.0) {
+    if (distPx >= 0.0) return 0.0;
+    const tRim = Math.max(0.0, Math.min(1.0, -distPx / rimWidthPx));
+    const oneMinusT = 1.0 - tRim;
+    const wallZ = Math.sqrt(Math.max(0.0, 1.0 - oneMinusT * oneMinusT)) * rimWidthPx * 0.85;
+    const centerDomeZ = Math.max(0.0, Math.min(1.0, -distPx / 42.0)) * (3.2 + lift * 2.4);
+    return wallZ + centerDomeZ;
+  }
+
+  /**
+   * Evaluates the 2D surface gradient grad(z) = (dz/dx, dz/dy) around a given point
+   */
+  evaluateSurfaceGradient(distCenter, gradDirection, rimWidthPx = 11.5, lift = 0.0) {
+    if (distCenter >= 0.0) return [0.0, 0.0];
+    const eps = 0.85;
+    const zAhead = this.evaluateMeniscusHeight(distCenter + eps, rimWidthPx, lift);
+    const zBehind = this.evaluateMeniscusHeight(distCenter - eps, rimWidthPx, lift);
+    const slope = (zAhead - zBehind) / (2.0 * eps);
+    return [
+      Number((gradDirection[0] * slope).toFixed(5)),
+      Number((gradDirection[1] * slope).toFixed(5)),
+    ];
+  }
+
+  /**
+   * Evaluates Snellius deflection vector Delta p(lambda) = d_eff * kappa(lambda) * grad(z)
+   */
+  computeDeflection(gradZX, gradZY, lift = 0.0, dynamicZoom = 1.0, beyondApple = 1.0) {
+    const effectiveDepth = this.opticalDepth * (1.0 + lift * 0.55);
+
+    // Green (central reference)
+    const dpGx = effectiveDepth * this.kappaGreen * gradZX;
+    const dpGy = effectiveDepth * this.kappaGreen * gradZY;
+
+    // Cauchy chromatic dispersion
+    const kappaR = this.kappaGreen + (this.kappaRed - this.kappaGreen) * beyondApple;
+    const kappaB = this.kappaGreen + (this.kappaBlue - this.kappaGreen) * beyondApple;
+
+    const dpRx = effectiveDepth * kappaR * gradZX;
+    const dpRy = effectiveDepth * kappaR * gradZY;
+
+    const dpBx = effectiveDepth * kappaB * gradZX;
+    const dpBy = effectiveDepth * kappaB * gradZY;
+
+    const chromaticSpread = Math.hypot(dpBx - dpRx, dpBy - dpRy);
+    const maxDeflection = Math.hypot(dpGx, dpGy);
+
+    return {
+      deltaPGreen: [Number(dpGx.toFixed(4)), Number(dpGy.toFixed(4))],
+      deltaPRed: [Number(dpRx.toFixed(4)), Number(dpRy.toFixed(4))],
+      deltaPBlue: [Number(dpBx.toFixed(4)), Number(dpBy.toFixed(4))],
+      chromaticSpread: Number(chromaticSpread.toFixed(4)),
+      maxDeflection: Number(maxDeflection.toFixed(4)),
+      effectiveDepth: Number(effectiveDepth.toFixed(3)),
+      isRestingZero: Math.abs(dpGx) < 0.0001 && Math.abs(dpGy) < 0.0001,
+    };
+  }
+}
+

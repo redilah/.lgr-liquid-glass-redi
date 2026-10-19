@@ -88,6 +88,8 @@ const float LGR_KEY_EXP      = ${lighting.keyLightExp.toFixed(2)};
 const float LGR_CROWN_EXP    = ${lighting.crownShelfExp.toFixed(2)};
 const float LGR_RIM_EXP      = ${lighting.bottomRimBounceExp.toFixed(2)};
 const float LGR_FLOW_EXP     = ${lighting.bernoulliGlintExp.toFixed(2)};
+const float LGR_OPTICAL_DEPTH    = ${optics.opticalDepth.toFixed(4)};
+const vec3  LGR_SNELL_KAPPA_RGB  = vec3(${optics.spectralKappa.r.toFixed(6)}, ${optics.spectralKappa.g.toFixed(6)}, ${optics.spectralKappa.b.toFixed(6)});
 const float LGR_CAUSTIC_INT  = ${caustics.intensity.toFixed(4)};
 const vec3  LGR_TINT_COLOR   = ${tintVec3};
 

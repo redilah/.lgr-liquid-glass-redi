@@ -140,3 +140,8 @@ Saat `lgrc` mengompilasi file `.lgr`, compiler secara otomatis menghitung parame
    $$\theta_{\text{crit}} = \arcsin\left(\frac{1.0}{n_0}\right)$$
 4. **Parameter Diferensial Pegas Orde-2 ($\omega_n, k, c$)**:
    $$\omega_n = \frac{2\pi}{T_{\text{response}}}, \quad k = \omega_n^2, \quad c = 2 \zeta \omega_n$$
+5. **Defleksi Pembiasan Optik Framebuffer Snellius ($\kappa_R, \kappa_G, \kappa_B, \Delta \vec{p}$)**:
+   $$\Delta \vec{p}(\lambda) = d_0 \cdot \left(\frac{n_{\text{air}} - n_{\text{glass}}(\lambda)}{n_{\text{glass}}(\lambda)}\right) \nabla z(x,y) = d_0 \cdot (\eta(\lambda) - 1.0) \nabla z(x,y)$$
+   Di mana $\kappa(\lambda) = \eta(\lambda) - 1.0 = \frac{1 - n(\lambda)}{n(\lambda)}$.
+   Pada saat istirahat (*resting state*), $\nabla z \to 0$ pada pusat lensa sehingga $\Delta \vec{p} \equiv 0$ (Invarian 1:1, tipografi di balik kaca tajam 100% tanpa distorsi kabur).
+

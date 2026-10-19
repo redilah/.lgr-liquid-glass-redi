@@ -11,6 +11,8 @@ material CrownCrystalRedi {
         wavelengths: spectrum(650nm, 550nm, 450nm);
         meniscusRimWidth: 9.2px;
         totalInternalReflection: true;
+        opticalDepth: 14.5px;
+        framebufferDistortion: true;
     }
 
     fluid {
@@ -48,6 +50,8 @@ material DiamondPrismRedi {
         wavelengths: spectrum(650nm, 550nm, 450nm);
         meniscusRimWidth: 10.5px;
         totalInternalReflection: true;
+        opticalDepth: 18.0px;
+        framebufferDistortion: true;
     }
 
     fluid {
