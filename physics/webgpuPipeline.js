@@ -126,6 +126,20 @@ export class LGRWebGPUComputePipeline {
     this.isSettled = false;
   }
 
+  injectShockwave(gridX, gridY, radius = 6.0, force = 4.2) {
+    this.spawnImpulse(gridX, gridY, radius, force);
+  }
+
+  injectRainDroplets(count = 5, maxAmp = 25.0) {
+    for (let i = 0; i < count; i++) {
+      const rx = 4 + Math.random() * (this.gridWidth - 8);
+      const ry = 4 + Math.random() * (this.gridHeight - 8);
+      const rad = 2.0 + Math.random() * 4.0;
+      const f = (0.3 + Math.random() * 0.7) * (maxAmp / 8.0);
+      this.spawnImpulse(rx, ry, rad, f);
+    }
+  }
+
   /**
    * Resets all wave fields to pure zero (1:1 Resting State)
    */

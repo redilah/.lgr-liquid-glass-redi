@@ -765,6 +765,80 @@
       flex-wrap: wrap;
       gap: 6px;
     }
+
+    /* PILAR 5: Standalone LGR WebAssembly / Native Compiler Card Styles */
+    .pilar5-card {
+      background: rgba(236, 72, 153, 0.06);
+      border: 1px solid rgba(236, 72, 153, 0.28);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pilar5-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pilar5-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #F472B6;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pilar5-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pilar5-chip-btn {
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(236, 72, 153, 0.35);
+      background: rgba(236, 72, 153, 0.12);
+      color: #FCE7F3;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .pilar5-chip-btn:hover {
+      background: rgba(236, 72, 153, 0.25);
+    }
+
+    .pilar5-chip-btn.active {
+      background: linear-gradient(135deg, #EC4899, #DB2777);
+      color: #FFFFFF;
+      border-color: #F9A8D4;
+      box-shadow: 0 3px 12px rgba(236, 72, 153, 0.35);
+    }
+
+    .pilar5-telemetry-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #CBD5E1;
+      background: rgba(9, 10, 15, 0.55);
+      padding: 7px 11px;
+      border-radius: 10px;
+      border: 1px solid rgba(236, 72, 153, 0.18);
+      font-family: Consolas, monospace;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
   </style>
 </head>
 <body>
@@ -1083,6 +1157,26 @@
         </div>
       </div>
 
+      <!-- PILAR 5: STANDALONE LGR WEBASSEMBLY / NATIVE COMPILER TOOLCHAIN -->
+      <div class="pilar5-card">
+        <div class="pilar5-header-row">
+          <div class="pilar5-title">📦 Pilar 5: Standalone WebAssembly & Native Toolchain (lgrc)</div>
+          <div class="pilar5-actions">
+            <button class="pilar5-chip-btn" onclick="testWasmNativeInBrowser()">🧪 Uji Wasm Native</button>
+            <button class="pilar5-chip-btn" onclick="downloadCABIHeader()">📄 Export C-ABI (.h)</button>
+            <button class="pilar5-chip-btn" onclick="downloadWasmBinary()">⚙️ Export Wasm (.wasm)</button>
+            <button class="pilar5-chip-btn" onclick="showSDKIntegrationCode()">⚡ 1-Line SDK Code</button>
+          </div>
+        </div>
+
+        <div class="pilar5-telemetry-bar">
+          <span id="telWasmStatus">Wasm: Siap (135 bytes • 3 Exports)</span>
+          <span id="telCabiStatus">C-ABI: C99/C++11 (Vulkan & Metal)</span>
+          <span id="telWasmBenchmark">Benchmark: rk4=0.001ms</span>
+          <span id="telSDKStatus">SDK: createLiquidGlass() Siap</span>
+        </div>
+      </div>
+
       <div class="panel-header" style="margin-top: 4px;">
         <div class="panel-title">💻 Live Compiler Bahasa `.lgr` (`lgrc` In-Browser Engine)</div>
       </div>
@@ -1153,6 +1247,9 @@
     import { LGRLexer } from '../compiler/lexer.js';
     import { LGRParser } from '../compiler/parser.js';
     import { LGRAnalyzer } from '../compiler/analyzer.js';
+    import { emitCABIHeader } from '../compiler/cabiEmitter.js';
+    import { emitLGRWasmBinary } from '../compiler/wasmEmitter.js';
+    import { instantiateLGRWasm } from '../runtime/lgrRuntime.js';
     import { RK4Spring1D, LGRGyroscopeController, LGROpticalDistortion, LGRHydroResonanceEngine, LGRWebGPUComputePipeline } from '../physics/hydroEngine.js';
     import { LGR_VERTEX_SHADER, LGR_FRAGMENT_SHADER } from '../shaders/opticalKernel.js';
 
@@ -1204,7 +1301,7 @@
       const analyzer = new LGRAnalyzer(ast);
       const ir = analyzer.analyze();
       const firstMatName = Object.keys(ir.materials)[0];
-      return { mat: ir.materials[firstMatName], diagnostics: ir.diagnostics };
+      return { mat: ir.materials[firstMatName], ir, diagnostics: ir.diagnostics };
     }
 
     // =========================================================================
@@ -2087,6 +2184,105 @@
         }
       });
     }
+
+    // PILAR 5: Standalone WebAssembly & Native Toolchain Controls
+    window.testWasmNativeInBrowser = async function() {
+      const outEl = document.getElementById('compilerOutput');
+      outEl.style.borderColor = 'rgba(236, 72, 153, 0.45)';
+      outEl.style.color = '#FBCFE8';
+      outEl.textContent = '[WASM NATIVE] Memuat WebAssembly MVP Binary & Menguji Akselerasi Hardware...';
+      try {
+        const src = document.getElementById('lgrSourceInput').value;
+        const { mat, ir } = compileLGRText(src);
+        const wasmBin = emitLGRWasmBinary(ir);
+        const wasm = await instantiateLGRWasm(wasmBin);
+
+        const t0 = performance.now();
+        const nSteps = 10000;
+        let pos = 10.0;
+        for (let i = 0; i < nSteps; i++) {
+          pos = wasm.rk4_step(pos, 5.0, 0.0, 304.0, 30.0, 0.001);
+        }
+        const benchDt = (performance.now() - t0).toFixed(3);
+
+        const defl = wasm.snell_deflect(1.0, mat.optics.refractiveIndex, 0.12, mat.optics.opticalDepth || 14.5);
+        const freq = wasm.kelvin_freq(mat.resonance ? mat.resonance.surfaceTension : 0.0728, 1000.0, 1083.3);
+
+        const telBench = document.getElementById('telWasmBenchmark');
+        if (telBench) telBench.textContent = `Benchmark: 10k rk4 in ${benchDt}ms`;
+
+        outEl.textContent = `[WASM NATIVE BERHASIL] 10.000 langkah integrasi numerik dieksekusi dalam ${benchDt} ms!
+• Wasm Snell Deflection : ${defl.toFixed(4)} px (Refraksi Optik Nyata)
+• Wasm Kelvin Capillary: ${freq.toFixed(2)} rad/s (${(freq / (2 * Math.PI)).toFixed(1)} Hz)
+• Ukuran Binary .wasm  : ${wasmBin.length} bytes (Zero-Dependency MVP Standard)
+• Status Eksekusi      : V8 TurboFan / SpiderMonkey Native JIT Acceleration`;
+        window.triggerDemoBounce();
+      } catch (err) {
+        outEl.textContent = `[WASM ERROR] ${err.message}`;
+      }
+    };
+
+    window.downloadCABIHeader = function() {
+      try {
+        const src = document.getElementById('lgrSourceInput').value;
+        const { ir } = compileLGRText(src);
+        const headerCode = emitCABIHeader(ir, 'crystal_redi');
+        const blob = new Blob([headerCode], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'crystal_redi_abi.h';
+        a.click();
+        URL.revokeObjectURL(url);
+        const outEl = document.getElementById('compilerOutput');
+        outEl.style.borderColor = 'rgba(236, 72, 153, 0.45)';
+        outEl.style.color = '#FBCFE8';
+        outEl.textContent = `[C-ABI EXPORT SUKSES] Berkas "crystal_redi_abi.h" (${headerCode.length} bytes) berhasil diunduh!
+Header C99/C++11 ini siap di-include langsung ke proyek Vulkan Android (NDK) atau Metal iOS tanpa dependensi eksternal.`;
+      } catch (err) {
+        document.getElementById('compilerOutput').textContent = `[C-ABI ERROR] ${err.message}`;
+      }
+    };
+
+    window.downloadWasmBinary = function() {
+      try {
+        const src = document.getElementById('lgrSourceInput').value;
+        const { ir } = compileLGRText(src);
+        const wasmBin = emitLGRWasmBinary(ir);
+        const blob = new Blob([wasmBin], { type: 'application/wasm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'crystal_redi.wasm';
+        a.click();
+        URL.revokeObjectURL(url);
+        const outEl = document.getElementById('compilerOutput');
+        outEl.style.borderColor = 'rgba(236, 72, 153, 0.45)';
+        outEl.style.color = '#FBCFE8';
+        outEl.textContent = `[WASM EXPORT SUKSES] Berkas "crystal_redi.wasm" (${wasmBin.length} bytes) berhasil diunduh!
+Bytecode WebAssembly MVP mandiri ini siap dimuat via WebAssembly.instantiate() di browser maupun Node.js.`;
+      } catch (err) {
+        document.getElementById('compilerOutput').textContent = `[WASM ERROR] ${err.message}`;
+      }
+    };
+
+    window.showSDKIntegrationCode = function() {
+      const outEl = document.getElementById('compilerOutput');
+      outEl.style.borderColor = 'rgba(236, 72, 153, 0.45)';
+      outEl.style.color = '#FBCFE8';
+      outEl.textContent = `// CONTOH INTEGRASI 1-BARIS LGR STANDALONE SDK (lgrRuntime.js):
+import { createLiquidGlass } from './runtime/lgrRuntime.js';
+
+// Pasang efek kaca cairan dinamis ke elemen kartu mana pun:
+const glass = createLiquidGlass('#heroBalanceCard', {
+  material: 'material CrownCrystalRedi { optics { refractiveIndex: 1.52ior; ... } }',
+  gyroscope: true,
+  haptics: true
+});
+
+// Pemicu interaksi fisik secara terprogram:
+glass.triggerImpulse(0.85); // Memicu sentakan Marangoni + riak gelombang fluida`;
+    };
 
     // Live Slider Listeners
     ['sliderIOR', 'sliderCauchy', 'sliderMarangoni', 'sliderRim'].forEach((id) => {

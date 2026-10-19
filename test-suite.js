@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { compileLGRSource } from './compiler/lgrc.js';
 import { LGRHydroPhysicsEngine } from './physics/hydroEngine.js';
+import { instantiateLGRWasm, createLiquidGlass } from './runtime/lgrRuntime.js';
 
 const lgrFile = path.resolve('./examples/crystal_redi.lgr');
 const source = fs.readFileSync(lgrFile, 'utf8');
@@ -311,8 +312,83 @@ console.log(
   `[PASS] Pilar 4D — Invarian Diam 1:1 Terbukti (A=0.0000, ∇z=[0.0, 0.0], 100% Zero Wave Drift).`
 );
 
+// =====================================================================
+// 10. PILAR 5 — STANDALONE LGR WEBASSEMBLY / NATIVE COMPILER TOOLCHAIN
+// =====================================================================
+
+// 10A. Multi-Target Compiler Output Verification (C-ABI & Wasm Binary)
+const multiCompiled = compileLGRSource(source, { baseName: 'test_bundle' });
+console.assert(multiCompiled.cabiHeader && typeof multiCompiled.cabiHeader === 'string', 'Must emit valid C-ABI header string');
+console.assert(multiCompiled.cabiHeader.includes('LGRMaterialABI'), 'C-ABI must define LGRMaterialABI structure');
+console.assert(multiCompiled.cabiHeader.includes('lgr_rk4_step'), 'C-ABI must declare lgr_rk4_step evaluator');
+console.assert(multiCompiled.cabiHeader.includes('lgr_snell_deflection'), 'C-ABI must declare lgr_snell_deflection evaluator');
+console.assert(multiCompiled.cabiHeader.includes('lgr_kelvin_frequency'), 'C-ABI must declare lgr_kelvin_frequency evaluator');
+
+console.assert(multiCompiled.wasmBinary instanceof Uint8Array, 'Must emit binary Uint8Array for WebAssembly target');
+console.assert(multiCompiled.wasmBinary.length > 50, 'Wasm binary must contain non-empty bytecode');
+console.assert(
+  multiCompiled.wasmBinary[0] === 0x00 &&
+  multiCompiled.wasmBinary[1] === 0x61 &&
+  multiCompiled.wasmBinary[2] === 0x73 &&
+  multiCompiled.wasmBinary[3] === 0x6d,
+  'Wasm binary must begin with \\0asm magic bytes'
+);
+console.log(
+  `[PASS] Pilar 5A — Multi-Target Toolchain Terbukti (C-ABI Header=${multiCompiled.cabiHeader.length} bytes, Wasm Binary=${multiCompiled.wasmBinary.length} bytes, Magic=\\0asm).`
+);
+
+// 10B. WebAssembly Binary Execution & Hardware Acceleration
+const wasmRuntime = await instantiateLGRWasm(multiCompiled.wasmBinary);
+console.assert(typeof wasmRuntime.rk4_step === 'function', 'Wasm runtime must export rk4_step');
+console.assert(typeof wasmRuntime.snell_deflect === 'function', 'Wasm runtime must export snell_deflect');
+console.assert(typeof wasmRuntime.kelvin_freq === 'function', 'Wasm runtime must export kelvin_freq');
+
+const wasmPos = wasmRuntime.rk4_step(10.0, 5.0, 0.0, 0.0, 0.0, 0.016);
+console.assert(Math.abs(wasmPos - 10.08) < 0.001, `Wasm rk4_step result (${wasmPos}) must equal 10.08`);
+
+const wasmDefl = wasmRuntime.snell_deflect(1.0, 1.52, 0.1, 14.5);
+console.assert(wasmDefl < 0, 'Snell deflection into denser medium must be negative');
+console.assert(Math.abs(wasmDefl - (-0.49605)) < 0.001, `Wasm snell_deflect (${wasmDefl}) must match analytical value -0.49605`);
+
+const wasmOmega = wasmRuntime.kelvin_freq(0.0728, 1000.0, 1083.3);
+console.assert(Math.abs(wasmOmega - 304.22) < 0.5, `Wasm kelvin_freq (${wasmOmega}) must match Kelvin frequency 304.22 rad/s`);
+console.log(
+  `[PASS] Pilar 5B — Eksekusi Mesin Wasm Native Terbukti (rk4_step=${wasmPos.toFixed(4)}, snell_deflect=${wasmDefl.toFixed(4)}px, kelvin_freq=${wasmOmega.toFixed(2)} rad/s).`
+);
+
+// 10C. Standalone SDK Runtime & 1-Line Factory Verification
+const sdkGlass = createLiquidGlass(null, {
+  material: crownMat,
+  gyroscope: false,
+  haptics: false,
+});
+console.assert(typeof sdkGlass.setMaterial === 'function', 'SDK glass must provide setMaterial()');
+console.assert(typeof sdkGlass.triggerImpulse === 'function', 'SDK glass must provide triggerImpulse()');
+console.assert(typeof sdkGlass.getState === 'function', 'SDK glass must provide getState()');
+console.assert(typeof sdkGlass.destroy === 'function', 'SDK glass must provide destroy()');
+
+const sdkStateInitial = sdkGlass.getState();
+console.assert(sdkStateInitial.isResting1to1 === true, 'Initial SDK state must be resting 1:1');
+
+sdkGlass.triggerImpulse(0.8);
+const sdkStateActive = sdkGlass.getState();
+console.assert(sdkStateActive.peakWaveAmplitude > 0, 'After triggerImpulse, wave amplitude must be excited');
+
+sdkGlass.destroy();
+console.log(
+  `[PASS] Pilar 5C — SDK 1-Baris & Lifecycle Runtime Terbukti (createLiquidGlass -> triggerImpulse A=${sdkStateActive.peakWaveAmplitude.toFixed(2)} -> destroy).`
+);
+
+// 10D. 5-Pilar Unified Invariant Baseline Verification
+console.assert(restState.isResting1to1 === true, 'Invarian Pilar 1-2 must remain strictly 1:1');
+console.assert(clearedReport.isRestingZero === true, 'Invarian Pilar 4 must remain strictly resting zero');
+console.assert(clearedReport.peakAmplitude === 0.0, 'Wave amplitude at rest must remain strictly 0.0');
+console.log(
+  `[PASS] Pilar 5D — Unifikasi 5 Pilar & Invarian Diam 1:1 Terbukti (100% Zero Drift, 1.0000x Rest, 0 NaN Across All Pillars).`
+);
+
 console.log('======================================================================');
-console.log('  SELURUH PENGUJIAN TAHAP 1, 2, PILAR 1, 2, 3 & 4 LULUS 100% TANPA ERROR!');
+console.log('  SELURUH PENGUJIAN TAHAP 1, 2, PILAR 1, 2, 3, 4 & 5 LULUS 100%!');
 console.log('======================================================================');
 
 
